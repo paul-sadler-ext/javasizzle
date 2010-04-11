@@ -1,0 +1,17 @@
+<project name="JSizzle" default="dist" basedir=".">
+	<description>
+		simple example build file
+    </description>
+
+	<target name="dist" description="generate the distribution">
+		<jar destfile="jsizzle.jar">
+			<fileset dir="bin" />
+			<service type="lombok.eclipse.EclipseAnnotationHandler">
+				<provider classname="lombok.eclipse.HandleSchema" />
+				<provider classname="lombok.eclipse.HandleAsFunction" />
+			</service>
+		</jar>
+		<copy file="jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
+	</target>
+</project>
+
