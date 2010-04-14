@@ -8,6 +8,7 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Predicates.notNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.isEmpty;
 import static com.google.common.collect.Iterables.transform;
 import static java.util.Arrays.asList;
 import static org.jsizzle.ValueObjects.uniques;
@@ -17,7 +18,6 @@ import java.util.Set;
 import java.util.Map.Entry;
 
 import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
 
 public class CompositeInvariable implements Invariable
 {
@@ -27,7 +27,7 @@ public class CompositeInvariable implements Invariable
     public CompositeInvariable(Iterable<Invariable> components)
     {
         this.components = components;
-        this.violations = uniques(concat(transform(filter(components, not(application)), Invariable.getViolations)),
+        this.violations = uniques(concat(transform(filter(components, not(application)), getViolations)),
             new Function<Entry<? extends Invariable, Set<String>>, Invariable>()
         {
             @Override
@@ -77,7 +77,7 @@ public class CompositeInvariable implements Invariable
                 return null;
             }
             final Iterable<Invariable> subInvariables = filter(transform(subData, this), notNull());
-            return Iterables.isEmpty(subInvariables) ? null : new CompositeInvariable(subInvariables);
+            return isEmpty(subInvariables) ? null : new CompositeInvariable(subInvariables);
         }
     };
 }
