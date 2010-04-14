@@ -88,17 +88,6 @@ public class AirlineImpl implements Airline
         return new AirlineSpec(routesSpec, flightsSpec, bookingsSpec);
     }
     
-//    static final class _SpecFlight implements Function<Flight, AirlineSpec.Flight>
-//    {
-//        _SpecFlight() {}
-//        
-//        public org.jsizzle.example.airline.AirlineSpec.Flight apply(Flight from)
-//        {
-//            return specFlight(from);
-//        }
-//    }
-//    static final Function<Flight, AirlineSpec.Flight> specFlight = new _SpecFlight();
-    
     @AsFunction
     static final AirlineSpec.Flight specFlight(Flight flight)
     {

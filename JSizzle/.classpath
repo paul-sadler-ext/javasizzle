@@ -14,7 +14,7 @@
 			<attribute name="javadoc_location" value="http://projectlombok.org/api"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="C:/eclipse/plugins/org.eclipse.jdt.core_3.5.1.v_972_R35x.jar"/>
+	<classpathentry kind="lib" path="C:/eclipse/plugins/org.eclipse.jdt.core_3.5.2.v_981_R35x.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
