@@ -1,7 +1,12 @@
 package org.jsizzle;
 
+import static com.google.common.collect.Maps.filterKeys;
+import static com.google.common.collect.Sets.union;
+
+import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
@@ -77,6 +82,49 @@ public class ValueObjects
                         return done.add(uniqueness.apply(input));
                     }
                 });
+            }
+        };
+    }
+    
+    public static <K, V> Map<K, V> override(final Map<K, V> left, final Map<K, V> right)
+    {
+        return new AbstractMap<K, V>()
+        {
+            @Override
+            public Set<Map.Entry<K, V>> entrySet()
+            {
+                return union(right.entrySet(), filterKeys(left, new Predicate<K>()
+                {
+                    @Override
+                    public boolean apply(K key)
+                    {
+                        return !right.containsKey(key);
+                    }
+                }).entrySet());
+            }
+
+            @Override
+            public boolean containsKey(Object key)
+            {
+                return left.containsKey(key) || right.containsKey(key);
+            }
+
+            @Override
+            public V get(Object key)
+            {
+                return right.containsKey(key) ? right.get(key) : left.get(key);
+            }
+
+            @Override
+            public boolean isEmpty()
+            {
+                return right.isEmpty() && left.isEmpty();
+            }
+
+            @Override
+            public Set<K> keySet()
+            {
+                return union(left.keySet(), right.keySet());
             }
         };
     }

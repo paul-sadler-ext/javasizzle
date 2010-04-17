@@ -41,7 +41,7 @@ class AirlineSpec
         
         @Invariant boolean capacityLimited()
         {
-            return capacity <= 100;
+            return capacity <= 10;
         }
     }
 

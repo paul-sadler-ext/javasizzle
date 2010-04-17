@@ -1,5 +1,6 @@
 package lombok.eclipse;
 
+import static java.util.Arrays.asList;
 import static lombok.eclipse.Eclipse.copyAnnotations;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Eclipse.toQualifiedName;
@@ -28,6 +29,7 @@ import lombok.AccessLevel;
 import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
 import lombok.eclipse.handlers.HandleEqualsAndHashCode;
+import lombok.eclipse.handlers.HandleGetter;
 import lombok.eclipse.handlers.HandleToString;
 import lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult;
 
@@ -75,20 +77,14 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                     final Source source)
     {
         final TypeDeclaration type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
-        final int modifiers = type == null ? 0 : type.modifiers;
-        if (type == null || (modifiers & (AccInterface | AccAnnotation)) != 0)
+        if (!isClass(type))
         {
-            errorNode.addError("Annotations and interfaces cannot be Schemas.");
+            errorNode.addError("Only classes can be Schemas.");
             return true;
-        }
+        }   
         
         // Make class public static final
         type.modifiers |= AccPublic;
-        
-        // Ignore enums
-        if ((modifiers & AccEnum) != 0)
-            return true;
-            
         type.modifiers |= AccFinal;
         if ((type.bits & IsMemberType) != 0)
             type.modifiers |= AccStatic;
@@ -124,24 +120,24 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                         // NOTE: Do not use the child as source, due to use of retrieveEndOfElementTypeNamePosition
                         // in org.eclipse.jdt.core.dom.ASTConverter.convertType
                         generateFunction(child, AccessLevel.PUBLIC, child, source);
-    
+                        new HandleGetter().generateGetterForField(child, source.node);
+                        
                         // If the field is initialised, leave it alone
                         if (field.initialization == null)
                         {
                             final EclipseNode includeAnnNode = findAnnotation(child, Include.class);
                             if (includeAnnNode != null)
                             {
-                                final String includedTypeName = toQualifiedName(field.type.getTypeName());
-                                final EclipseNode includedTypeNode = findType(typeNode.top(), includedTypeName);
+                                final EclipseNode includedTypeNode = findType(typeNode, asList(field.type.getTypeName()));
                                 if (includedTypeNode == null)
                                 {
-                                    includeAnnNode.addError("Local type " + includedTypeName + " not found (may not be local).");
+                                    includeAnnNode.addError("Local type " + toQualifiedName(field.type.getTypeName()) + " not found (may not be local).");
                                     break;
                                 }
                                 final EclipseNode includeConsNode = getExistingLombokConstructor(includedTypeNode);
                                 if (includeConsNode == null)
                                 {
-                                    includeAnnNode.addError("Cannot Include " + includedTypeName + " (may not be a Schema).");
+                                    includeAnnNode.addError("Cannot Include " + toQualifiedName(field.type.getTypeName()) + " (may not be a Schema).");
                                     break;
                                 }
                                 final ConstructorDeclaration includeCons = (ConstructorDeclaration)includeConsNode.get();
@@ -158,7 +154,9 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                                               source.copyType(arg.type, true),
                                                               AccPublic,
                                                               source);
-                                            generateFunction(typeNode.getNodeFor(includedField), AccessLevel.PUBLIC, child, source);
+                                            final EclipseNode fieldNode = typeNode.getNodeFor(includedField);
+                                            generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
+                                            new HandleGetter().generateGetterForField(fieldNode, source.node);
                                             consBuilder.addAssignedField(includedField, false);
                                         }
                                     }
@@ -222,25 +220,38 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
 
         for (EclipseNode subTypeNode : typeNode.down())
         {
-            if (subTypeNode.getKind() == Kind.TYPE && !subTypeNode.isHandled())
+            if (subTypeNode.getKind() == Kind.TYPE && !subTypeNode.isHandled() &&
+                    isClass((TypeDeclaration)subTypeNode.get()))
+            {
                 makeSchemaClass(subTypeNode, subTypeNode, source(subTypeNode.get()));
+            }
         }
 
         return true;
     }
 
-    private static EclipseNode findType(EclipseNode node, String typeName)
+    private boolean isClass(final TypeDeclaration type)
     {
-        for (EclipseNode child : node.down())
+        return (type != null && (type.modifiers & (AccInterface | AccAnnotation | AccEnum)) == 0);
+    }
+
+    private static EclipseNode findType(EclipseNode scope, List<char[]> typeName)
+    {
+        final EclipseNode found = findTypeInScope(scope, typeName);
+        return found != null ? found : (scope.up() == null ? null : findType(scope.up(), typeName));
+    }
+
+    private static EclipseNode findTypeInScope(EclipseNode scope, List<char[]> typeName)
+    {
+        if (!typeName.isEmpty())
         {
-            if (child.getKind() == Kind.TYPE)
+            for (EclipseNode child : scope.down())
             {
-                if (child.getName().equals(typeName))
-                    return child;
-                
-                final EclipseNode found = findType(child, typeName);
-                if (found != null)
-                    return found;
+                if (child.getKind() == Kind.TYPE)
+                {
+                    if (child.getName().equals(new String(typeName.get(0))))
+                        return typeName.size() == 1 ? child : findType(child, typeName.subList(1, typeName.size()));
+                }
             }
         }
         return null;
