@@ -1,12 +1,18 @@
 package org.jsizzle.examples.helpdesk;
 
+import static com.google.common.base.Predicates.and;
+import static com.google.common.base.Predicates.compose;
+import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.instanceOf;
-import static com.google.common.collect.ImmutableList.copyOf;
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.concat;
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Sets.union;
 import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
+import static org.jsizzle.ValueObjects.list;
 import static org.jsizzle.ValueObjects.override;
 
 import java.util.List;
@@ -18,6 +24,7 @@ import org.jsizzle.Include;
 import org.jsizzle.Invariant;
 import org.jsizzle.Prime;
 import org.jsizzle.Schema;
+import org.jsizzle.Xi;
 
 @Schema
 class HelpdeskSpec
@@ -73,6 +80,12 @@ class HelpdeskSpec
             return status == Status.OPEN || any(notes, instanceOf(ResolutionNote.class));
         }
         
+        @Invariant boolean resolutionIsLastNote()
+        {
+            final List<Note> resNotes = list(filter(notes, instanceOf(ResolutionNote.class)));
+            return resNotes.isEmpty() || resNotes.equals(singletonList(getLast(notes)));
+        }
+        
         class Init
         {
             Prime<Issue> issue;
@@ -119,7 +132,7 @@ class HelpdeskSpec
                 return issue.after.customer.equals(issue.before.customer) &&
                        issue.after.analyst.equals(issue.before.analyst) &&
                        issue.after.references.equals(issue.before.references) &&
-                       issue.after.notes.equals(copyOf(concat(issue.before.notes, singleton(note)))) &&
+                       issue.after.notes.equals(list(concat(issue.before.notes, singleton(note)))) &&
                        issue.after.status.equals(issue.before.status);
             }
         }
@@ -166,7 +179,7 @@ class HelpdeskSpec
         }
     }
     
-    class PromoteIssueOperation
+    class PromoteExistingIssue
     {
         @Include PromoteIssue promoteIssue;
         
@@ -190,30 +203,49 @@ class HelpdeskSpec
     
     class SetIssueAnalyst
     {
-        @Include PromoteIssueOperation promoteIssue;
+        @Include PromoteExistingIssue promoteIssue;
         @Include Issue.SetAnalyst setAnalyst;
     }
     
     class AddIssueNote
     {
-        @Include PromoteIssueOperation promoteIssue;
+        @Include PromoteExistingIssue promoteIssue;
         @Include Issue.AddNote addNote;
     }
     
     class AddIssueReference
     {
-        @Include PromoteIssueOperation promoteIssue;
+        @Include PromoteExistingIssue promoteIssue;
         @Include Issue.AddReference addReference;
         
-        @Invariant boolean preCondition()
+        @Invariant boolean referenceExists()
         {
             return helpdesk.before.issues.containsKey(reference);
+        }
+        
+        @Invariant boolean referenceNotCircular()
+        {
+            return !id.equals(reference);
         }
     }
     
     class CloseIssue
     {
-        @Include PromoteIssueOperation promoteIssue;
+        @Include PromoteExistingIssue promoteIssue;
         @Include Issue.Close close;
+    }
+    
+    class ReportIssuesForAnalyst
+    {
+        Xi<HelpdeskSpec> helpdesk;
+        List<Issue> analystIssues;
+        Analyst analyst;
+
+        @Invariant boolean postCondition()
+        {
+            return analystIssues.equals(list(filter(helpdesk.before.issues.values(),
+                                                    and(compose(equalTo(analyst), Issue.getAnalyst),
+                                                        compose(equalTo(Status.OPEN), Issue.getStatus)))));
+        }
     }
 }
