@@ -3,9 +3,11 @@ package org.jsizzle;
 import static com.google.common.collect.Maps.filterKeys;
 import static com.google.common.collect.Sets.union;
 
+import java.util.AbstractList;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -125,6 +127,30 @@ public class ValueObjects
             public Set<K> keySet()
             {
                 return union(left.keySet(), right.keySet());
+            }
+        };
+    }
+    
+    public static <T> List<T> list(final Iterable<T> iterable)
+    {
+        return new AbstractList<T>()
+        {
+            @Override
+            public T get(int position)
+            {
+                return Iterables.get(iterable, position);
+            }
+
+            @Override
+            public int size()
+            {
+                return Iterables.size(iterable);
+            }
+
+            @Override
+            public Iterator<T> iterator()
+            {
+                return iterable.iterator();
             }
         };
     }
