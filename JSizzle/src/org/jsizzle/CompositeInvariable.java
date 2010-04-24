@@ -3,6 +3,7 @@
  */
 package org.jsizzle;
 
+import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
@@ -21,7 +22,7 @@ public abstract class CompositeInvariable implements Invariable
     public CompositeInvariable(Iterable<? extends Invariable> components)
     {
         this.components = components;
-        this.violations = uniques(concat(transform(filter(components, invariant), getViolations)),
+        this.violations = uniques(concat(transform(filter(components, not(invariant)), getViolations)),
             new Function<Entry<? extends Invariable, Set<String>>, Invariable>()
         {
             @Override
