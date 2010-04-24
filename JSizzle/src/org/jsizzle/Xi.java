@@ -1,9 +1,9 @@
 package org.jsizzle;
 
+import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Collections.singleton;
-import static java.util.Collections.singletonMap;
+import static org.jsizzle.Invariables.noViolations;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.Map.Entry;
 
@@ -17,12 +17,11 @@ public class Xi<T extends Binding> extends Delta<T> implements Invariable
     @Override
     public Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations()
     {
-        return apply(null) ? singletonMap(this, singleton("Data changed")).entrySet()
-                           : Collections.<Entry<Invariable, Set<String>>>emptySet();
+        return invariant() ? noViolations : singleton(immutableEntry(this, singleton("dataChanged")));
     }
 
     @Override
-    public boolean apply(Void input)
+    public boolean invariant()
     {
         return before.getData().equals(after.getData());
     }

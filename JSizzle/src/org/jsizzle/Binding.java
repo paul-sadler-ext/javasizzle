@@ -1,12 +1,12 @@
 package org.jsizzle;
 
-import static com.google.common.base.Predicates.and;
-import static com.google.common.base.Predicates.or;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableList;
-import static org.jsizzle.CompositeInvariable.asInvariable;
+import static org.jsizzle.Invariables.and;
+import static org.jsizzle.Invariables.asInvariable;
+import static org.jsizzle.Invariables.or;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -19,12 +19,12 @@ public abstract class Binding implements Invariable
     private final List<Object> data = new ArrayList<Object>();
     private final Set<String> violations = new LinkedHashSet<String>();
     private final Set<Invariable> invariables = new LinkedHashSet<Invariable>();
-    private final Invariable composition = new CompositeInvariable(invariables);
+    private final Invariable composition = and(invariables);
 
     protected void addDatum(Object datum)
     {
         data.add(datum);
-        final Invariable invariable = asInvariable.apply(datum);
+        final Invariable invariable = asInvariable(datum);
         if (invariable != null)
             invariables.add(invariable);
     }
@@ -43,15 +43,15 @@ public abstract class Binding implements Invariable
     }
     
     @Override
-    public boolean apply(Void input)
+    public boolean invariant()
     {
         final boolean disjoint = getClass().getAnnotation(Disjoint.class) != null;
-        return violations.isEmpty() && (disjoint ? or(invariables) : and(invariables)).apply(null);
+        return violations.isEmpty() && (disjoint ? or(invariables) : and(invariables)).invariant();
     }
 
     public void checkInvariant() throws IllegalStateException
     {
-        if (!apply(null))
+        if (!invariant())
             throw new IllegalStateException(getViolations().toString());
     }
     
