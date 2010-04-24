@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 // To animate, would need client to manage identity, or implement equals/hashCode
-// Cannot relate to implementation code because cannot instantiate intermediate state
+// Cannot tie to implementation because cannot instantiate intermediate state
 public class HelpdeskJavaSpec
 {
     public static class Customer {}
@@ -62,7 +62,8 @@ public class HelpdeskJavaSpec
         }
     }
     
-    public static class Issue
+    // Issue is not static so we can manage helpdesk state
+    public class Issue
     {
         private final Customer customer;
         private Analyst analyst;
@@ -80,6 +81,8 @@ public class HelpdeskJavaSpec
             this.status = Status.OPEN;
             this.notes = new ArrayList<Note>();
             this.references = new HashSet<Issue>();
+            
+            issues.add(this);
             
             // Not clear how to do invariants
         }
@@ -104,6 +107,7 @@ public class HelpdeskJavaSpec
         {
             assert reference != null;
             assert reference != this; // Assuming entity reference pattern
+            assert issues.contains(reference);
             
             references.add(reference);
         }
