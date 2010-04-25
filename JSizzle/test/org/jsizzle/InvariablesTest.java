@@ -26,6 +26,36 @@ import org.junit.Test;
 
 public class InvariablesTest
 {
+    public static final Invariable bad = new Invariable()
+    {
+        @Override
+        public Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations()
+        {
+            return singleton(immutableEntry(this, singleton("bad")));
+        }
+
+        @Override
+        public boolean invariant()
+        {
+            return false;
+        }
+    };
+    
+    public static final Invariable good = new Invariable()
+    {
+        @Override
+        public Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations()
+        {
+            return emptySet();
+        }
+
+        @Override
+        public boolean invariant()
+        {
+            return true;
+        }
+    };
+
     @Test
     public void testNullAsInvariable()
     {
@@ -149,34 +179,4 @@ public class InvariablesTest
         assertFalse(not(good).invariant());
         assertEquals(1, size(not(good).getViolations()));
     }
-    
-    private static final Invariable bad = new Invariable()
-    {
-        @Override
-        public Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations()
-        {
-            return singleton(immutableEntry(this, singleton("bad")));
-        }
-
-        @Override
-        public boolean invariant()
-        {
-            return false;
-        }
-    };
-    
-    private static final Invariable good = new Invariable()
-    {
-        @Override
-        public Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations()
-        {
-            return emptySet();
-        }
-
-        @Override
-        public boolean invariant()
-        {
-            return true;
-        }
-    };
 }
