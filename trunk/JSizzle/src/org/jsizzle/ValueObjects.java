@@ -17,6 +17,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class ValueObjects
@@ -157,6 +158,68 @@ public class ValueObjects
             public Iterator<T> iterator()
             {
                 return iterable.iterator();
+            }
+        };
+    }
+    
+    public static <T> Predicate<Set<? super T>> only(final Set<T> target)
+    {
+        return new Predicate<Set<? super T>>()
+        {
+            @Override
+            public boolean apply(Set<? super T> input)
+            {
+                return Sets.difference(input, target).isEmpty();
+            }
+        };
+    }
+    
+    public static <F, T> Map<F, T> domainRestrict(final Function<? super F, T> function, final Set<F> restriction)
+    {
+        return new AbstractMap<F, T>()
+        {
+            @Override
+            public Set<Entry<F, T>> entrySet()
+            {
+                return transform(restriction, new Function<F, Entry<F, T>>()
+                {
+                    @Override
+                    public Entry<F, T> apply(F from)
+                    {
+                        return Maps.immutableEntry(from, function.apply(from));
+                    }
+                });
+            }
+
+            @Override
+            public boolean containsKey(Object key)
+            {
+                return restriction.contains(key);
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public T get(Object key)
+            {
+                return function.apply((F)key);
+            }
+
+            @Override
+            public boolean isEmpty()
+            {
+                return restriction.isEmpty();
+            }
+
+            @Override
+            public Set<F> keySet()
+            {
+                return restriction;
+            }
+
+            @Override
+            public int size()
+            {
+                return restriction.size();
             }
         };
     }

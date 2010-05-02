@@ -2,6 +2,8 @@ package org.jsizzle;
 
 import static com.google.common.base.Functions.identity;
 import static com.google.common.collect.Iterables.isEmpty;
+import static com.google.common.collect.Maps.immutableEntry;
+import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -9,6 +11,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 import static org.jsizzle.ValueObjects.list;
 
@@ -243,5 +246,51 @@ public class ValueObjectsTest
         final Set<Object> transformed = ValueObjects.transform(flintstones, identity());
         flintstones.add("Barney");
         assertEquals(flintstones, transformed);
+    }
+    
+    @Test
+    public void testEmptyContainsOnlyEmpty()
+    {
+        assertTrue(ValueObjects.only(emptySet()).apply(emptySet()));
+    }
+    
+    @Test
+    public void testEmptyContainsOnlySome()
+    {
+        assertTrue(ValueObjects.only(singleton("Fred")).apply(emptySet()));
+    }
+    
+    @Test
+    public void testSomeContainsOnlySame()
+    {
+        assertTrue(ValueObjects.only(singleton("Fred")).apply(singleton("Fred")));
+    }
+    
+    @Test
+    public void testSomeNotContainsOnlyDifferent()
+    {
+        assertFalse(ValueObjects.only(singleton("Fred")).apply(singleton("Barney")));
+    }
+    
+    @Test
+    public void testDomainRestrictToNothing()
+    {
+        final Map<Object, Object> restricted = ValueObjects.domainRestrict(identity(), emptySet());
+        assertTrue(restricted.isEmpty());
+        assertEquals(0, restricted.size());
+        assertTrue(restricted.keySet().isEmpty());
+        assertTrue(restricted.entrySet().isEmpty());
+        assertTrue(restricted.values().isEmpty());
+    }
+    
+    @Test
+    public void testDomainRestrictToSingleton()
+    {
+        final Map<String, Object> restricted = ValueObjects.domainRestrict(identity(), singleton("Fred"));
+        assertFalse(restricted.isEmpty());
+        assertEquals(1, restricted.size());
+        assertEquals(singleton("Fred"), restricted.keySet());
+        assertEquals(singleton(immutableEntry("Fred", "Fred")), restricted.entrySet());
+        assertEquals(singleton("Fred"), newHashSet(restricted.values()));
     }
 }

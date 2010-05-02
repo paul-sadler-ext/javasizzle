@@ -1,14 +1,18 @@
 package org.jsizzle;
 
+import static com.google.common.base.Functions.identity;
+import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.all;
-import static com.google.common.collect.Sets.union;
-import static org.jsizzle.ValueObjects.bigUnion;
+import static com.google.common.collect.Maps.transformValues;
+import static java.util.Collections.singleton;
+import static org.jsizzle.ValueObjects.domainRestrict;
+import static org.jsizzle.ValueObjects.only;
 import static org.jsizzle.ValueObjects.transform;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.Lists;
 
 @Schema
@@ -16,7 +20,9 @@ class JavaSpec
 {
     class Name {}
     
-    enum Visibility { PRIVATE, PACKAGE, PROTECTED, PUBLIC }
+    class TypeName {}
+    
+    enum Visibility { DEFAULT, PRIVATE, PROTECTED, PUBLIC }
     
     enum Modifier { FINAL, STATIC, VOLATILE, TRANSIENT }
     
@@ -24,21 +30,18 @@ class JavaSpec
     {
         Visibility visibility;
         Set<Modifier> otherModifiers;
+        Set<TypeName> annotations;
     }
     
     class Type
     {
         @Include Modifiers modifiers;
-        Name id;
+        TypeName name;
         Set<Variable> fields;
+        Set<Constructor> constructors;
         Set<Method> methods;
         Set<Type> memberTypes;
-        Set<Type> superTypes;
-        
-        Set<Method> getAllMethods()
-        {
-            return union(methods, bigUnion(transform(superTypes, Type.getAllMethods)));
-        }
+        Set<TypeName> superTypes;
         
         @Invariant boolean fieldNamesUnique()
         {
@@ -52,40 +55,53 @@ class JavaSpec
         
         @Invariant boolean memberTypeNamesUnique()
         {
-            return transform(memberTypes, Type.getId).size() == memberTypes.size();
+            return transform(memberTypes, Type.getName).size() == memberTypes.size();
         }
+    }
+    
+    class Environment
+    {
+        Map<Name, Variable> variables;
         
-        @Invariant boolean cannotReduceMethodVisibility()
+        @Invariant boolean environmentVariablesHaveConsistentName()
         {
-            return all(methods, new Predicate<Method>()
-            {
-                public boolean apply(final Method method)
-                {
-                    return all(bigUnion(transform(superTypes, Type.getAllMethods)), new Predicate<Method>()
-                    {
-                        public boolean apply(final Method superMethod)
-                        {
-                            return !method.signature.equals(superMethod.signature) ||
-                                method.visibility.ordinal() >= superMethod.visibility.ordinal();
-                        }
-                    });
-                }
-            });
+            return domainRestrict(identity(), variables.keySet()).equals(transformValues(variables, Variable.getName));
         }
+    }
+    
+    interface Statement
+    {
+    }
+    
+    class Procedure
+    {
+        List<Variable> arguments;
+        List<Statement> statements;
+
+        @Invariant boolean argumentsHaveAllowedModifiers()
+        {
+            return all(Lists.transform(arguments, Variable.getVisibility), equalTo(Visibility.DEFAULT))
+                && all(Lists.transform(arguments, Variable.getOtherModifiers), only(singleton(Modifier.FINAL)));
+        }
+    }
+    
+    class Constructor
+    {
+        @Include Procedure procedure;
     }
     
     class Signature
     {
         Name name;
-        List<Name> argumentTypes;
-        Name returnType;
+        List<TypeName> argumentTypes;
+        TypeName returnType;
     }
 
     class Method
     {
         @Include Modifiers modifiers;
         @Include Signature signature;
-        List<Variable> arguments;
+        @Include Procedure procedure;
         
         @Invariant boolean argumentsMatchSignature()
         {
@@ -97,6 +113,6 @@ class JavaSpec
     {
         @Include Modifiers modifiers;
         Name name;
-        Name typeName;
+        TypeName typeName;
     }
 }
