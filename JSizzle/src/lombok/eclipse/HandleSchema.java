@@ -77,162 +77,163 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                     final Source source)
     {
         final TypeDeclaration type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
-        if (!isClass(type))
+        
+        // Entirely reject null types and annotations
+        if (type == null || (type.modifiers & AccAnnotation) != 0)
         {
-            errorNode.addError("Only classes can be Schemas.");
+            errorNode.addError("This cannot be a Schema");
             return true;
-        }   
+        }
         
-        // Make class public static final
+        // Make class public
         type.modifiers |= AccPublic;
-        type.modifiers |= AccFinal;
-        if ((type.bits & IsMemberType) != 0)
-            type.modifiers |= AccStatic;
         
-        // Extend org.jsizzle.Binding
-        if (type.superclass == null)
+        // For enumerations and interfaces, we don't do anything more
+        if ((type.modifiers & (AccInterface | AccEnum)) == 0)
         {
-            type.superclass = source.generated(new QualifiedTypeReference(
-                fromQualifiedName("org.jsizzle.Binding"),
-                source.p(3)));
-        }
-        else
-        {
-            typeNode.addError("Schema classes may not use inheritance. Include instead.");
-        }
-        
-        final ConstructorBuilder consBuilder = new ConstructorBuilder(typeNode, source);
-        for (EclipseNode child : typeNode.down())
-        {
-            if (!child.isHandled())
+            // Make class static final
+            type.modifiers |= AccFinal;
+            if ((type.bits & IsMemberType) != 0)
+                type.modifiers |= AccStatic;
+            
+            // Extend org.jsizzle.Binding
+            if (type.superclass == null)
             {
-                if (child.getKind() == Kind.FIELD)
+                type.superclass = source.generated(new QualifiedTypeReference(
+                    fromQualifiedName("org.jsizzle.Binding"),
+                    source.p(3)));
+            }
+            else
+            {
+                typeNode.addError("Schema classes may not use inheritance. Include instead.");
+                return true;
+            }
+            
+            final ConstructorBuilder consBuilder = new ConstructorBuilder(typeNode, source);
+            for (EclipseNode child : typeNode.down())
+            {
+                if (!child.isHandled())
                 {
-                    final FieldDeclaration field = (FieldDeclaration)child.get();
-                    
-                    // Make fields public and final
-                    field.modifiers |= (AccFinal | AccPublic);
-                    
-                    // Otherwise, leave statics alone (uninitialised statics will error due to final)
-                    if ((field.modifiers & AccStatic) == 0)
+                    if (child.getKind() == Kind.FIELD)
                     {
-                        // Generate the field access function
-                        // NOTE: Do not use the child as source, due to use of retrieveEndOfElementTypeNamePosition
-                        // in org.eclipse.jdt.core.dom.ASTConverter.convertType
-                        generateFunction(child, AccessLevel.PUBLIC, child, source);
-                        new HandleGetter().generateGetterForField(child, source.node);
+                        final FieldDeclaration field = (FieldDeclaration)child.get();
                         
-                        // If the field is initialised, leave it alone
-                        if (field.initialization == null)
+                        // Make fields public and final
+                        field.modifiers |= (AccFinal | AccPublic);
+                        
+                        // Otherwise, leave statics alone (uninitialised statics will error due to final)
+                        if ((field.modifiers & AccStatic) == 0)
                         {
-                            final EclipseNode includeAnnNode = findAnnotation(child, Include.class);
-                            if (includeAnnNode != null)
+                            // Generate the field access function
+                            // NOTE: Do not use the child as source, due to use of retrieveEndOfElementTypeNamePosition
+                            // in org.eclipse.jdt.core.dom.ASTConverter.convertType
+                            generateFunction(child, AccessLevel.PUBLIC, child, source);
+                            new HandleGetter().generateGetterForField(child, source.node);
+                            
+                            // If the field is initialised, leave it alone
+                            if (field.initialization == null)
                             {
-                                final EclipseNode includedTypeNode = findType(typeNode, asList(field.type.getTypeName()));
-                                if (includedTypeNode == null)
+                                final EclipseNode includeAnnNode = findAnnotation(child, Include.class);
+                                if (includeAnnNode != null)
                                 {
-                                    includeAnnNode.addError("Local type " + toQualifiedName(field.type.getTypeName()) + " not found (may not be local).");
-                                    break;
-                                }
-                                final EclipseNode includeConsNode = getExistingLombokConstructor(includedTypeNode);
-                                if (includeConsNode == null)
-                                {
-                                    includeAnnNode.addError("Cannot Include " + toQualifiedName(field.type.getTypeName()) + " (may not be a Schema).");
-                                    break;
-                                }
-                                final ConstructorDeclaration includeCons = (ConstructorDeclaration)includeConsNode.get();
-                                if (includeCons.arguments != null)
-                                {
-                                    for (Argument arg : includeCons.arguments)
+                                    final EclipseNode includedTypeNode = findType(typeNode, asList(field.type.getTypeName()));
+                                    if (includedTypeNode == null)
                                     {
-                                        if (fieldExists(new String(arg.name), typeNode) == MemberExistsResult.NOT_EXISTS)
+                                        includeAnnNode.addError("Local type " + toQualifiedName(field.type.getTypeName()) + " not found (may not be local).");
+                                        break;
+                                    }
+                                    final EclipseNode includeConsNode = getExistingLombokConstructor(includedTypeNode);
+                                    if (includeConsNode == null)
+                                    {
+                                        includeAnnNode.addError("Cannot Include " + toQualifiedName(field.type.getTypeName()) + " (may not be a Schema).");
+                                        break;
+                                    }
+                                    final ConstructorDeclaration includeCons = (ConstructorDeclaration)includeConsNode.get();
+                                    if (includeCons.arguments != null)
+                                    {
+                                        for (Argument arg : includeCons.arguments)
                                         {
-                                            // NOTE: Must set source positions on copied type, because for some reason Eclipse
-                                            // doesn't like argument types with source positions from a different scope.
-                                            final FieldDeclaration includedField = injectSchemaField(typeNode,
-                                                              arg.name,
-                                                              source.copyType(arg.type, true),
-                                                              AccPublic,
-                                                              source);
-                                            final EclipseNode fieldNode = typeNode.getNodeFor(includedField);
-                                            generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
-                                            new HandleGetter().generateGetterForField(fieldNode, source.node);
-                                            consBuilder.addAssignedField(includedField, false);
+                                            if (fieldExists(new String(arg.name), typeNode) == MemberExistsResult.NOT_EXISTS)
+                                            {
+                                                // NOTE: Must set source positions on copied type, because for some reason Eclipse
+                                                // doesn't like argument types with source positions from a different scope.
+                                                final FieldDeclaration includedField = injectSchemaField(typeNode,
+                                                                  arg.name,
+                                                                  source.copyType(arg.type, true),
+                                                                  AccPublic,
+                                                                  source);
+                                                final EclipseNode fieldNode = typeNode.getNodeFor(includedField);
+                                                generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
+                                                new HandleGetter().generateGetterForField(fieldNode, source.node);
+                                                consBuilder.addAssignedField(includedField, false);
+                                            }
                                         }
                                     }
+                                    consBuilder.addConstructedField(field, includeCons);
                                 }
-                                consBuilder.addConstructedField(field, includeCons);
-                            }
-                            else
-                            {
-                                consBuilder.addAssignedField(field, true);
+                                else
+                                {
+                                    consBuilder.addAssignedField(field, true);
+                                }
                             }
                         }
                     }
-                }
-                else if (child.getKind() == Kind.METHOD)
-                {
-                    final AbstractMethodDeclaration method = (AbstractMethodDeclaration)child.get();
-                    if (method instanceof ConstructorDeclaration)
+                    else if (child.getKind() == Kind.METHOD)
                     {
-                        if ((method.bits & ASTNode.IsDefaultConstructor) == 0)
-                            typeNode.getNodeFor(method).addWarning("Schema classes should not have constructors.");
-                    }
-                    else if (method instanceof MethodDeclaration)
-                    {
-                        final EclipseNode invariantAnnNode = findAnnotation(child, Invariant.class);
-                        if (invariantAnnNode != null)
+                        final AbstractMethodDeclaration method = (AbstractMethodDeclaration)child.get();
+                        if (method instanceof ConstructorDeclaration)
                         {
-                            if (Arrays.equals(((MethodDeclaration)method).returnType.getLastToken(), TypeConstants.BOOLEAN)
-                                && (method.arguments == null || method.arguments.length == 0))
+                            if ((method.bits & ASTNode.IsDefaultConstructor) == 0)
+                                typeNode.getNodeFor(method).addWarning("Schema classes should not have constructors.");
+                        }
+                        else if (method instanceof MethodDeclaration)
+                        {
+                            final EclipseNode invariantAnnNode = findAnnotation(child, Invariant.class);
+                            if (invariantAnnNode != null)
                             {
-                                // Make invariant method private final
-                                method.modifiers |= (AccPrivate | AccFinal);
-                                consBuilder.addInvariant(method);
+                                if (Arrays.equals(((MethodDeclaration)method).returnType.getLastToken(), TypeConstants.BOOLEAN)
+                                    && (method.arguments == null || method.arguments.length == 0))
+                                {
+                                    // Make invariant method private final
+                                    method.modifiers |= (AccPrivate | AccFinal);
+                                    consBuilder.addInvariant(method);
+                                }
+                                else
+                                {
+                                    typeNode.getNodeFor(method).addError("Invariant method must have no arguments and return a boolean.");
+                                }
                             }
                             else
                             {
-                                typeNode.getNodeFor(method).addError("Invariant method must have no arguments and return a boolean.");
+                                // Make utility method public final
+                                method.modifiers |= (AccPublic | AccFinal);
+                                // Generate the method access function
+                                generateFunction(child, AccessLevel.PUBLIC, child, source);
                             }
-                        }
-                        else
-                        {
-                            // Make utility method public final
-                            method.modifiers |= (AccPublic | AccFinal);
-                            // Generate the method access function
-                            generateFunction(child, AccessLevel.PUBLIC, child, source);
                         }
                     }
                 }
             }
+            
+            // If no fields, create an Object field for identity
+            if (!consBuilder.hasArgs())
+                consBuilder.addAssignedField(injectIdentityField(typeNode, source), false);
+            
+            // Inject the constructor
+            injectMethod(typeNode, consBuilder.build());
+            
+            // Create toString, equals and hashCode
+            new HandleToString().generateToStringForType(typeNode, errorNode);
+            new HandleEqualsAndHashCode().generateMethods(typeNode, errorNode, null, null, false, true);
         }
         
-        // If no fields, create an Object field for identity
-        if (!consBuilder.hasArgs())
-            consBuilder.addAssignedField(injectIdentityField(typeNode, source), false);
-        
-        // Inject the constructor
-        injectMethod(typeNode, consBuilder.build());
-        
-        // Create toString, equals and hashCode
-        new HandleToString().generateToStringForType(typeNode, errorNode);
-        new HandleEqualsAndHashCode().generateMethods(typeNode, errorNode, null, null, false, true);
-
         for (EclipseNode subTypeNode : typeNode.down())
         {
-            if (subTypeNode.getKind() == Kind.TYPE && !subTypeNode.isHandled() &&
-                    isClass((TypeDeclaration)subTypeNode.get()))
-            {
+            if (subTypeNode.getKind() == Kind.TYPE && !subTypeNode.isHandled())
                 makeSchemaClass(subTypeNode, subTypeNode, source(subTypeNode.get()));
-            }
         }
 
         return true;
-    }
-
-    private boolean isClass(final TypeDeclaration type)
-    {
-        return (type != null && (type.modifiers & (AccInterface | AccAnnotation | AccEnum)) == 0);
     }
 
     private static EclipseNode findType(EclipseNode scope, List<char[]> typeName)

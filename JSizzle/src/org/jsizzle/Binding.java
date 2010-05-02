@@ -1,6 +1,7 @@
 package org.jsizzle;
 
 import static com.google.common.collect.Iterables.concat;
+import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableList;
@@ -13,6 +14,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Map.Entry;
+
+import junit.framework.Assert;
+
+import com.google.common.base.Function;
 
 public abstract class Binding implements Invariable
 {
@@ -52,7 +57,16 @@ public abstract class Binding implements Invariable
     public void checkInvariant() throws IllegalStateException
     {
         if (!invariant())
-            throw new IllegalStateException(getViolations().toString());
+        {
+            Assert.fail(transform(getViolations(), new Function<Entry<? extends Invariable, Set<String>>, String>()
+            {
+                @Override
+                public String apply(Entry<? extends Invariable, Set<String>> from)
+                {
+                    return from.getValue() + " failed in " + from.getKey().getClass().getSimpleName();
+                }
+            }).toString());
+        }
     }
     
     public List<?> getData()
