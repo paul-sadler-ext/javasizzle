@@ -9,6 +9,7 @@ import static org.jsizzle.ValueObjects.domainRestrict;
 import static org.jsizzle.ValueObjects.only;
 import static org.jsizzle.ValueObjects.transform;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,7 +21,9 @@ class JavaSpec
 {
     class Name {}
     
-    class TypeName {}
+    interface TypeName {}
+    
+    enum PrimitiveName implements TypeName { VOID, BYTE, SHORT, INTEGER, LONG, CHAR, BOOLEAN, DOUBLE, FLOAT }
     
     enum Visibility { DEFAULT, PRIVATE, PROTECTED, PUBLIC }
     
@@ -57,24 +60,34 @@ class JavaSpec
         {
             return transform(memberTypes, Type.getName).size() == memberTypes.size();
         }
+        
+        @Invariant boolean modifiersAllowed()
+        {
+            return only(EnumSet.of(Modifier.FINAL, Modifier.STATIC)).apply(otherModifiers);
+        }
     }
     
     class Environment
     {
         Map<Name, Variable> variables;
+        Type type;
         
         @Invariant boolean environmentVariablesHaveConsistentName()
         {
             return domainRestrict(identity(), variables.keySet()).equals(transformValues(variables, Variable.getName));
         }
+        
+        @Invariant boolean allFieldsAvailable()
+        {
+            return variables.keySet().containsAll(transform(type.fields, Variable.getName));
+        }
     }
     
-    interface Statement
-    {
-    }
+    interface Statement {}
     
     class Procedure
     {
+        @Include Modifiers modifiers;
         List<Variable> arguments;
         List<Statement> statements;
 
@@ -83,11 +96,21 @@ class JavaSpec
             return all(Lists.transform(arguments, Variable.getVisibility), equalTo(Visibility.DEFAULT))
                 && all(Lists.transform(arguments, Variable.getOtherModifiers), only(singleton(Modifier.FINAL)));
         }
+        
+        @Invariant boolean modifiersAllowed()
+        {
+            return only(EnumSet.of(Modifier.FINAL, Modifier.STATIC)).apply(otherModifiers);
+        }
     }
     
     class Constructor
     {
         @Include Procedure procedure;
+        
+        @Invariant boolean noModifiersAllowed()
+        {
+            return otherModifiers.isEmpty();
+        }
     }
     
     class Signature
@@ -99,7 +122,6 @@ class JavaSpec
 
     class Method
     {
-        @Include Modifiers modifiers;
         @Include Signature signature;
         @Include Procedure procedure;
         
