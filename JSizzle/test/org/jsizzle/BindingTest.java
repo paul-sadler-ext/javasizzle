@@ -9,6 +9,7 @@ import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 import static org.jsizzle.InvariablesTest.bad;
 import static org.jsizzle.ValueObjects.list;
+import junit.framework.AssertionFailedError;
 
 import org.junit.Test;
 
@@ -32,7 +33,7 @@ public class BindingTest
         withDatum.checkInvariant();
     }
     
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = AssertionFailedError.class)
     public void testInvariantViolation()
     {
         assertFalse(withInvariantViolation.invariant());
@@ -43,7 +44,7 @@ public class BindingTest
         withInvariantViolation.checkInvariant();
     }
     
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = AssertionFailedError.class)
     public void testDatumViolation()
     {
         assertFalse(withDatumViolation.invariant());
@@ -54,7 +55,7 @@ public class BindingTest
         withDatumViolation.checkInvariant();
     }
     
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = AssertionFailedError.class)
     public void testSubBindingViolation()
     {
         assertFalse(withSubBindingViolation.invariant());
