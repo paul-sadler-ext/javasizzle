@@ -92,7 +92,7 @@ class HelpdeskSpec
             Customer customer;
             Analyst analyst;
             
-            @Invariant boolean postCondition()
+            @Invariant boolean customerAndAnalystAssignedAndStatusOpen()
             {
                 return issue.after.customer.equals(customer) &&
                        issue.after.analyst.equals(analyst) &&
@@ -107,7 +107,7 @@ class HelpdeskSpec
             Delta<Issue> issue;
             Analyst analyst;
             
-            @Invariant boolean postCondition()
+            @Invariant boolean analystSet()
             {
                 return issue.after.customer.equals(issue.before.customer) &&
                        issue.after.analyst.equals(analyst) &&
@@ -122,12 +122,12 @@ class HelpdeskSpec
             Delta<Issue> issue;
             Note note;
             
-            @Invariant boolean preCondition()
+            @Invariant boolean mustBeCurrentAnalyst()
             {
                 return issue.before.analyst.equals(note.getAnalyst());
             }
             
-            @Invariant boolean postCondition()
+            @Invariant boolean noteAdded()
             {
                 return issue.after.customer.equals(issue.before.customer) &&
                        issue.after.analyst.equals(issue.before.analyst) &&
@@ -142,7 +142,7 @@ class HelpdeskSpec
             Delta<Issue> issue;
             Id reference;
             
-            @Invariant boolean postCondition()
+            @Invariant boolean referenceAdded()
             {
                 return issue.after.customer.equals(issue.before.customer) &&
                        issue.after.analyst.equals(issue.before.analyst) &&
@@ -156,7 +156,7 @@ class HelpdeskSpec
         {
             Delta<Issue> issue;
             
-            @Invariant boolean postCondition()
+            @Invariant boolean closed()
             {
                 return issue.after.customer.equals(issue.before.customer) &&
                        issue.after.analyst.equals(issue.before.analyst) &&
@@ -173,7 +173,7 @@ class HelpdeskSpec
         Delta<Issue> issue;
         Id id;
         
-        @Invariant boolean postCondition()
+        @Invariant boolean issuesUpdated()
         {
             return helpdesk.after.issues.equals(override(helpdesk.before.issues, singletonMap(id, issue.after)));
         }
@@ -183,7 +183,7 @@ class HelpdeskSpec
     {
         @Include PromoteIssue promoteIssue;
         
-        @Invariant boolean preCondition()
+        @Invariant boolean mustBeExistingIssue()
         {
             return helpdesk.before.issues.containsKey(id) &&
                    helpdesk.before.issues.get(id).equals(issue.before);
@@ -195,7 +195,7 @@ class HelpdeskSpec
         @Include Issue.Init initIssue;
         @Include PromoteIssue promoteIssue;
         
-        @Invariant boolean preCondition()
+        @Invariant boolean mustBeNewIssue()
         {
             return !helpdesk.before.issues.containsKey(id);
         }
@@ -213,6 +213,9 @@ class HelpdeskSpec
         @Include Issue.AddNote addNote;
     }
     
+    /**
+     * Note that Issue references are not mutual.
+     */
     class AddIssueReference
     {
         @Include PromoteExistingIssue promoteIssue;
@@ -241,7 +244,7 @@ class HelpdeskSpec
         List<Issue> analystIssues;
         Analyst analyst;
 
-        @Invariant boolean postCondition()
+        @Invariant boolean analystOpenIssuesReported()
         {
             return analystIssues.equals(list(filter(helpdesk.before.issues.values(),
                                                     and(compose(equalTo(analyst), Issue.getAnalyst),

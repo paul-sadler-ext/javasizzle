@@ -85,6 +85,12 @@ public class ValueObjects
                     }
                 });
             }
+
+            @Override
+            public String toString()
+            {
+                return Iterables.toString(this);
+            }
         };
     }
     
