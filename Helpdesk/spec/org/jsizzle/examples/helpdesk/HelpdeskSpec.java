@@ -42,7 +42,7 @@ class HelpdeskSpec
         Analyst getAnalyst();
     }
     
-    class AbstractNote implements Note
+    class AbstractNote
     {
         Analyst analyst;
     }
