@@ -1,17 +1,15 @@
 package org.jsizzle;
 
-import static com.google.common.base.Functions.identity;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.all;
-import static com.google.common.collect.Maps.transformValues;
 import static java.util.Collections.singleton;
-import static org.jsizzle.ValueObjects.domainRestrict;
+import static org.jsizzle.ValueObjects.contains;
 import static org.jsizzle.ValueObjects.only;
 import static org.jsizzle.ValueObjects.transform;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.Lists;
@@ -36,15 +34,24 @@ class JavaSpec
         Set<TypeName> annotations;
     }
     
+    enum TypeFlag { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
+    
+    enum TypeScope { TOP, MEMBER }
+    
+    enum DefaultSuperTypeName implements TypeName { OBJECT, ENUM, NONE }
+    
     class Type
     {
         @Include Modifiers modifiers;
         TypeName name;
+        TypeFlag flag;
+        TypeScope scope;
         Set<Variable> fields;
         Set<Constructor> constructors;
         Set<Method> methods;
         Set<Type> memberTypes;
-        Set<TypeName> superTypes;
+        TypeName superType;
+        Set<TypeName> interfaces;
         
         @Invariant boolean fieldNamesUnique()
         {
@@ -61,29 +68,72 @@ class JavaSpec
             return transform(memberTypes, Type.getName).size() == memberTypes.size();
         }
         
+        @Invariant boolean memberTypesAreMemberScope()
+        {
+            return all(transform(memberTypes, getScope), equalTo(TypeScope.MEMBER));
+        }
+        
         @Invariant boolean modifiersAllowed()
         {
-            return only(EnumSet.of(Modifier.FINAL, Modifier.STATIC)).apply(otherModifiers);
-        }
-    }
-    
-    class Environment
-    {
-        Map<Name, Variable> variables;
-        Type type;
-        
-        @Invariant boolean environmentVariablesHaveConsistentName()
-        {
-            return domainRestrict(identity(), variables.keySet()).equals(transformValues(variables, Variable.getName));
+            switch (flag)
+            {
+            case CLASS:
+                return only(EnumSet.of(Modifier.FINAL, Modifier.STATIC)).apply(otherModifiers);
+            default:
+                return otherModifiers.isEmpty();
+            }
         }
         
-        @Invariant boolean allFieldsAvailable()
+        @Invariant boolean interfaceHasNoState()
         {
-            return variables.keySet().containsAll(transform(type.fields, Variable.getName));
+            switch (flag)
+            {
+            case INTERFACE:
+            case ANNOTATION:
+                return all(transform(fields, Variable.getOtherModifiers), contains(Modifier.STATIC));
+            default:
+                return true;
+            }
+        }
+        
+        @Invariant boolean interfaceCannotBeConstructed()
+        {
+            switch (flag)
+            {
+            case INTERFACE:
+            case ANNOTATION:
+                return constructors.isEmpty();
+            default:
+                return true;
+            }
+        }
+        
+        @Invariant boolean interfaceHasNoImplementation()
+        {
+            switch (flag)
+            {
+            case INTERFACE:
+            case ANNOTATION:
+                return all(transform(methods, Method.getStatements), equalTo(Collections.<Statement>emptyList()));
+            default:
+                return true;
+            }
+        }
+        
+        @Invariant boolean hasAppropriateSuperType()
+        {
+            switch (flag)
+            {
+            case ANNOTATION:
+            case INTERFACE:
+                return superType == DefaultSuperTypeName.NONE;
+            case ENUMERATION:
+                return superType == DefaultSuperTypeName.ENUM;
+            default:
+                return superType != DefaultSuperTypeName.NONE;
+            }
         }
     }
-    
-    interface Statement {}
     
     class Procedure
     {
@@ -136,5 +186,55 @@ class JavaSpec
         @Include Modifiers modifiers;
         Name name;
         TypeName typeName;
+    }
+
+    interface Statement {}
+
+    interface Expression {}
+    
+    class If implements Statement
+    {
+        Expression condition;
+        Statement conditional;
+    }
+    
+    class VariableAccess implements Expression
+    {
+        Name variableName;
+    }
+    
+    class DoubleEquals implements Expression
+    {
+        Expression left, right;
+    }
+    
+    class Throw implements Statement
+    {
+        Expression throwable;
+    }
+    
+    class New implements Expression, Statement
+    {
+        TypeName typeName;
+        List<Expression> arguments;
+    }
+    
+    class Literal implements Expression {}
+    
+    class FieldAccess implements Expression
+    {
+        Name fieldName;
+    }
+    
+    class Assignment implements Expression, Statement
+    {
+        Expression assigned;
+        Expression value;
+    }
+    
+    class MethodCall implements Expression, Statement
+    {
+        Name methodName;
+        List<Expression> arguments;
     }
 }

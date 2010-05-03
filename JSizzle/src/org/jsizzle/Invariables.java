@@ -3,7 +3,6 @@ package org.jsizzle;
 import static com.google.common.base.Predicates.notNull;
 import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Iterables.any;
-import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.isEmpty;
 import static com.google.common.collect.Iterables.transform;
@@ -36,7 +35,11 @@ public class Invariables
         }
         else if (from instanceof Map<?, ?>)
         {
-            subData = concat(((Map<?, ?>)from).keySet(), ((Map<?, ?>)from).values());
+            subData = ((Map<?, ?>)from).entrySet();
+        }
+        else if (from instanceof Map.Entry<?, ?>)
+        {
+            subData = asList(((Map.Entry<?, ?>)from).getKey(), ((Map.Entry<?, ?>)from).getValue());
         }
         else
         {

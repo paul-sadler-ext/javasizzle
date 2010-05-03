@@ -1,5 +1,6 @@
 package lombok.eclipse;
 
+import static lombok.core.handlers.TransformationsUtil.toGetterName;
 import static lombok.eclipse.Eclipse.ECLIPSE_DO_NOT_TOUCH_FLAG;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Source.source;
@@ -17,7 +18,6 @@ import java.util.Arrays;
 import lombok.AccessLevel;
 import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
-import lombok.core.handlers.TransformationsUtil;
 import lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult;
 
 import org.eclipse.jdt.internal.compiler.CompilationResult;
@@ -159,7 +159,7 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                 fromType = enclosingType;
                 toType = createBoxedTypeReference(field.type);
                 boolean isBoolean = Arrays.equals(field.type.getLastToken(), "boolean".toCharArray()) && toType.dimensions() == 0;
-                functionName = TransformationsUtil.toGetterName(target.getName(), isBoolean);
+                functionName = toGetterName(target.getName(), isBoolean);
                 final FieldReference fieldRef = source.generated(new FieldReference(field.name, source.p));
                 fieldRef.receiver = fromReference;
                 fieldRef.token = field.name;
