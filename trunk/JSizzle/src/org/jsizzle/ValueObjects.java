@@ -6,6 +6,7 @@ import static com.google.common.collect.Sets.union;
 import java.util.AbstractList;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -220,6 +221,18 @@ public class ValueObjects
             public int size()
             {
                 return restriction.size();
+            }
+        };
+    }
+    
+    public static <T extends Collection<?>> Predicate<T> contains(final Object value)
+    {
+        return new Predicate<T>()
+        {
+            @Override
+            public boolean apply(T input)
+            {
+                return input.contains(value);
             }
         };
     }
