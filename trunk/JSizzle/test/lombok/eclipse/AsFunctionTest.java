@@ -27,6 +27,17 @@ public class AsFunctionTest
         return 1;
     }
     
+    private static class OneArgConstructor
+    {
+        public int x;
+        
+        @AsFunction
+        private OneArgConstructor(int x)
+        {
+            this.x = x;
+        }
+    }
+    
     @Test
     public void testNoArgInstance()
     {
@@ -36,12 +47,18 @@ public class AsFunctionTest
     @Test
     public void testOneArgInstance()
     {
-        assertEquals(1, oneArgInstance.apply(0).intValue());
+        assertEquals(1, oneArgInstance.apply(1).intValue());
     }
     
     @Test
     public void testOneArgStatic()
     {
-        assertEquals(1, oneArgStatic.apply(0).intValue());
+        assertEquals(1, oneArgStatic.apply(1).intValue());
+    }
+    
+    @Test
+    public void testOneArgConstructor()
+    {
+        assertEquals(1, OneArgConstructor.oneArgConstructor.apply(1).x);
     }
 }

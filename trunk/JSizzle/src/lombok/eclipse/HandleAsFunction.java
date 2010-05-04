@@ -1,5 +1,7 @@
 package lombok.eclipse;
 
+import static java.lang.Character.isUpperCase;
+import static java.lang.Character.toLowerCase;
 import static lombok.core.handlers.TransformationsUtil.toGetterName;
 import static lombok.eclipse.Eclipse.ECLIPSE_DO_NOT_TOUCH_FLAG;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
@@ -89,65 +91,89 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
             
             // Check that we are on a method or field
             if (target == null || !(target.getKind() == Kind.METHOD || target.getKind() == Kind.FIELD)
-                    || !(target.get() instanceof MethodDeclaration || target.get() instanceof FieldDeclaration))
+                    || !(target.get() instanceof MethodDeclaration
+                            || target.get() instanceof ConstructorDeclaration
+                            || target.get() instanceof FieldDeclaration))
             {
-                throw new IllegalArgumentException("@AsFunction is legal only on methods and fields.");
+                throw new IllegalArgumentException("@AsFunction is legal only on constructors, methods and fields.");
             }
             
+            final String enclosingTypeName = target.up().getName();
             final TypeReference enclosingType =
-                source.generated(new SingleTypeReference(target.up().getName().toCharArray(), source.p));
+                source.generated(new SingleTypeReference(enclosingTypeName.toCharArray(), source.p));
             final SingleNameReference fromReference = source.generated(new SingleNameReference("from".toCharArray(), source.p));
     
             if (target.getKind() == Kind.METHOD)
             {
-                functionName = target.getName();
-                final MethodDeclaration method = (MethodDeclaration)target.get();
-                toType = createBoxedTypeReference(method.returnType);
+                final AbstractMethodDeclaration method = (AbstractMethodDeclaration)target.get();
                 modifiers = method.modifiers;
     
-                final Expression receiver, argument;
                 /*
                  * Supported method signatures:
+                 *  one-arg constructor -> static function
                  *  no-arg instance -> static function
                  *  one-arg instance -> instance function
                  *  one-arg static -> static function
                  */
-                if ((modifiers & AccStatic) != 0)
+                if (method instanceof ConstructorDeclaration)
                 {
                     if (method.arguments != null && method.arguments.length == 1)
                     {
+                        functionName = createConstructorFunctionName(enclosingTypeName);
                         fromType = createBoxedTypeReference(method.arguments[0].type);
-                        receiver = source.generated(new SingleNameReference(target.up().getName().toCharArray(), source.p));
-                        argument = fromReference;
+                        toType = enclosingType;
+                        modifiers |= AccStatic;
+                        application = createAllocation(enclosingType, fromReference);
                     }
                     else
                     {
-                        // Static method must have one parameter
-                        throw new IllegalArgumentException("@AsFunction can only support one-argument static methods.");
+                        // Constructor must have one parameter
+                        throw new IllegalArgumentException("@AsFunction can only support one-argument constructors.");
                     }
                 }
                 else
                 {
-                    // Instance method can have zero or one parameter
-                    if (method.arguments == null || method.arguments.length == 0)
+                    final Expression receiver, argument;
+                    functionName = target.getName();
+                    toType = createBoxedTypeReference(((MethodDeclaration)method).returnType);
+
+                    if ((modifiers & AccStatic) != 0)
                     {
-                        fromType = enclosingType;
-                        receiver = fromReference;
-                        argument = null;
-                        modifiers |= AccStatic;
-                    }
-                    else if (method.arguments.length == 1)
-                    {
-                        fromType = createBoxedTypeReference(method.arguments[0].type);
-                        receiver = source.generated(new QualifiedThisReference(enclosingType, source.pS, source.pE));
-                        argument = fromReference;
+                        if (method.arguments != null && method.arguments.length == 1)
+                        {
+                            fromType = createBoxedTypeReference(method.arguments[0].type);
+                            receiver = source.generated(new SingleNameReference(enclosingTypeName.toCharArray(), source.p));
+                            argument = fromReference;
+                        }
+                        else
+                        {
+                            // Static method must have one parameter
+                            throw new IllegalArgumentException("@AsFunction can only support one-argument static methods.");
+                        }
                     }
                     else
                     {
-                        throw new IllegalArgumentException("@AsFunction can only support one- or no-argument instance methods.");
+                        // Instance method can have zero or one parameter
+                        if (method.arguments == null || method.arguments.length == 0)
+                        {
+                            fromType = enclosingType;
+                            receiver = fromReference;
+                            argument = null;
+                            modifiers |= AccStatic;
+                        }
+                        else if (method.arguments.length == 1)
+                        {
+                            fromType = createBoxedTypeReference(method.arguments[0].type);
+                            receiver = source.generated(new QualifiedThisReference(enclosingType, source.pS, source.pE));
+                            argument = fromReference;
+                        }
+                        else
+                        {
+                            throw new IllegalArgumentException("@AsFunction can only support one- or no-argument instance methods.");
+                        }
                     }
+                    application = createMethodCall(receiver, method, argument);
                 }
-                application = createMethodCall(receiver, method, argument);
             }
             else
             {
@@ -223,6 +249,23 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
             injectField(typeNode, functionField);
         }
 
+        private String createConstructorFunctionName(final String enclosingTypeName)
+        {
+            final char firstLetter = enclosingTypeName.charAt(0);
+            return isUpperCase(firstLetter) ?
+                    toLowerCase(firstLetter) + enclosingTypeName.substring(1) :
+                        toGetterName(enclosingTypeName, false);
+        }
+
+        private Expression createAllocation(final TypeReference type,
+                                            final SingleNameReference argument)
+        {
+            final AllocationExpression constructed = source.generated(new AllocationExpression());
+            constructed.type = source.copyType(type, false);
+            constructed.arguments = new Expression[] {argument};
+            return constructed;
+        }
+
         private boolean typeHasClinit()
         {
             for (EclipseNode child : typeNode.down())
@@ -272,7 +315,7 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
         }
     
         private MessageSend createMethodCall(final Expression receiver,
-                                             final MethodDeclaration method,
+                                             final AbstractMethodDeclaration method,
                                              final Expression argument)
         {
             final MessageSend methodCall = source.generated(new MessageSend());
