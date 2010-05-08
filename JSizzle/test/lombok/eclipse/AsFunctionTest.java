@@ -6,11 +6,12 @@ import lombok.core.PrintAST;
 import org.jsizzle.AsFunction;
 import org.junit.Test;
 
-import com.google.common.base.Function;
-
 @PrintAST
 public class AsFunctionTest
 {
+    @AsFunction
+    int field = 1;
+    
     @AsFunction
     private int noArgInstance()
     {
@@ -20,13 +21,37 @@ public class AsFunctionTest
     @AsFunction
     private int oneArgInstance(int n)
     {
-        return 1;
+        return n;
+    }
+    
+    @AsFunction
+    private int twoArgInstance(int x, int y)
+    {
+        return x + y;
+    }
+    
+    @AsFunction
+    private int threeArgInstance(int x, int y, int z)
+    {
+        return x + y + z;
     }
     
     @AsFunction
     private static int oneArgStatic(int x)
     {
-        return 1;
+        return x;
+    }
+    
+    @AsFunction
+    private static int twoArgStatic(int x, int y)
+    {
+        return x + y;
+    }
+    
+    @AsFunction
+    private static int threeArgStatic(int x, int y, int z)
+    {
+        return x + y + z;
     }
 
     private static class OneArgConstructor
@@ -38,6 +63,23 @@ public class AsFunctionTest
         {
             this.x = x;
         }
+    }
+
+    private static class ThreeArgConstructor
+    {
+        public int n;
+        
+        @AsFunction
+        private ThreeArgConstructor(int x, int y, int z)
+        {
+            this.n = x + y + z;
+        }
+    }
+    
+    @Test
+    public void testField()
+    {
+        assertEquals(1, getField.apply(this).intValue());
     }
     
     @Test
@@ -53,6 +95,18 @@ public class AsFunctionTest
     }
     
     @Test
+    public void testTwoArgInstance()
+    {
+        assertEquals(3, twoArgInstance.apply(1).apply(2).intValue());
+    }
+    
+    @Test
+    public void testThreeArgInstance()
+    {
+        assertEquals(6, threeArgInstance.apply(1).apply(2).apply(3).intValue());
+    }
+    
+    @Test
     public void testOneArgStatic()
     {
         assertEquals(1, oneArgStatic.apply(1).intValue());
@@ -65,56 +119,20 @@ public class AsFunctionTest
     }
     
     @Test
+    public void testThreeArgConstructor()
+    {
+        assertEquals(6, ThreeArgConstructor.threeArgConstructor.apply(1).apply(2).apply(3).n);
+    }
+    
+    @Test
+    public void testTwoArgStatic()
+    {
+        assertEquals(3, twoArgStatic.apply(1).apply(2).intValue());
+    }
+    
+    @Test
     public void testThreeArgStatic()
     {
-        assertEquals(6, add.apply(1).apply(2).apply(3).intValue());
-    }
-
-    static Function<Integer, Function<Integer, Function<Integer, Integer>>> add = new $add();
-
-    static final class $add implements Function<Integer, Function<Integer, Function<Integer, Integer>>>
-    {
-        @Override
-        public Function<Integer, Function<Integer, Integer>> apply(final Integer x)
-        {
-            return new $addY(x);
-        }
-
-        final class $addY implements Function<Integer, Function<Integer, Integer>>
-        {
-            private final Integer x;
-
-            private $addY(Integer x)
-            {
-                this.x = x;
-            }
-
-            @Override
-            public Function<Integer, Integer> apply(final Integer y)
-            {
-                return new $addZ(y);
-            }
-
-            final class $addZ implements Function<Integer, Integer>
-            {
-                private final Integer y;
-
-                private $addZ(Integer y)
-                {
-                    this.y = y;
-                }
-
-                @Override
-                public Integer apply(final Integer z)
-                {
-                    return add(x, y, z);
-                }
-            }
-        }
-    }
-
-    static int add(int x, int y, int z)
-    {
-        return x + y + z;
+        assertEquals(6, threeArgStatic.apply(1).apply(2).apply(3).intValue());
     }
 }
