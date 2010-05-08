@@ -13,20 +13,10 @@ import org.jsizzle.JavaSpec.TypeName;
 import org.jsizzle.JavaSpec.TypeScope;
 import org.jsizzle.JavaSpec.Visibility;
 
-import com.google.common.base.Function;
-
 @Schema
 public class SchemaSpec
 {
     Delta<Type> type;
-    
-    static Function<Delta<Type>, SchemaSpec> schemaSpec = new Function<Delta<Type>, SchemaSpec>()
-    {
-        public SchemaSpec apply(Delta<Type> type)
-        {
-            return new SchemaSpec(type);
-        }
-    };
     
     @Invariant boolean annotationsCannotBeSchemas()
     {
@@ -51,7 +41,7 @@ public class SchemaSpec
                 || type.after.otherModifiers.contains(Modifier.STATIC);
     }
     
-    @Invariant boolean schemaClassesMustExtendObject()
+    @Invariant boolean beforeClassesMustExtendObject()
     {
         return type.before.flag != TypeFlag.CLASS
                 || (type.before.superType == DefaultSuperTypeName.OBJECT);

@@ -10,7 +10,7 @@ import org.junit.Test;
 public class CurryingTest
 {
     @AsFunction
-    private String concat(String prefix, int suffix)
+    private static String concat(String prefix, int suffix)
     {
         return prefix + suffix;
     }
