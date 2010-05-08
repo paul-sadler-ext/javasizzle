@@ -130,6 +130,6 @@ class AirlineSpec
     @Disjoint class AddFlight
     {
         @Include FlightExists alreadyExists;
-        @Include AddFlight0 addFlight;
+        @Include AddFlight0 addFlight0;
     }
 }

@@ -219,8 +219,10 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             if (!consBuilder.hasArgs())
                 consBuilder.addAssignedField(injectIdentityField(typeNode, source), false);
             
-            // Inject the constructor
-            injectMethod(typeNode, consBuilder.build());
+            // Inject the constructor and construction function
+            final ConstructorDeclaration constructor = consBuilder.build();
+            injectMethod(typeNode, constructor);
+            generateFunction(typeNode.getNodeFor(constructor), AccessLevel.PUBLIC, errorNode, source);
             
             // Create toString, equals and hashCode
             new HandleToString().generateToStringForType(typeNode, errorNode);
