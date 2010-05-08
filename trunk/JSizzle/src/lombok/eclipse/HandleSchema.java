@@ -284,14 +284,14 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                                       final int visibility,
                                                       final Source source)
     {
-        final FieldDeclaration identityField = source
+        final FieldDeclaration field = source
                 .generated(new FieldDeclaration(name, source.pS, source.pE));
-        identityField.declarationSourceStart = identityField.sourceStart;
-        identityField.declarationEnd = identityField.declarationSourceEnd = identityField.sourceEnd;
-        identityField.modifiers = AccFinal | visibility;
-        identityField.type = type;
-        injectField(schemaNode, identityField);
-        return identityField;
+        field.declarationSourceStart = field.sourceStart;
+        field.declarationEnd = field.declarationSourceEnd = field.sourceEnd;
+        field.modifiers = AccFinal | visibility;
+        field.type = type;
+        injectField(schemaNode, field);
+        return field;
     }
     
     private class ConstructorBuilder
@@ -401,7 +401,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         private Assignment createFieldAssignment(final FieldDeclaration field, final Expression value)
         {
             final FieldReference thisX = createFieldReference(field.name);
-            return source.generated(new Assignment(thisX, value, (int)source.p));
+            return source.generated(new Assignment(thisX, value, source.pE));
         }
 
         private FieldReference createFieldReference(final char[] name)
