@@ -24,7 +24,7 @@ public class AsFunctionTest
     }
     
     @AsFunction
-    private int oneArgStatic(int x)
+    private static int oneArgStatic(int x)
     {
         return 1;
     }
@@ -70,48 +70,46 @@ public class AsFunctionTest
         assertEquals(6, add.apply(1).apply(2).apply(3).intValue());
     }
 
-    static Function<Integer, Function<Integer, Function<Integer, Integer>>> add = new add();
+    static Function<Integer, Function<Integer, Function<Integer, Integer>>> add = new $add();
 
-    static final class add implements Function<Integer, Function<Integer, Function<Integer, Integer>>>
+    static final class $add implements Function<Integer, Function<Integer, Function<Integer, Integer>>>
     {
         @Override
         public Function<Integer, Function<Integer, Integer>> apply(final Integer x)
         {
             return new $addY(x);
         }
-    }
 
-    static final class $addY implements Function<Integer, Function<Integer, Integer>>
-    {
-        private final Integer x;
-
-        private $addY(Integer x)
+        final class $addY implements Function<Integer, Function<Integer, Integer>>
         {
-            this.x = x;
-        }
+            private final Integer x;
 
-        @Override
-        public Function<Integer, Integer> apply(final Integer y)
-        {
-            return new $addZ(x, y);
-        }
-    }
+            private $addY(Integer x)
+            {
+                this.x = x;
+            }
 
-    static final class $addZ implements Function<Integer, Integer>
-    {
-        private final Integer x;
-        private final Integer y;
+            @Override
+            public Function<Integer, Integer> apply(final Integer y)
+            {
+                return new $addZ(y);
+            }
 
-        private $addZ(Integer x, Integer y)
-        {
-            this.x = x;
-            this.y = y;
-        }
+            final class $addZ implements Function<Integer, Integer>
+            {
+                private final Integer y;
 
-        @Override
-        public Integer apply(final Integer z)
-        {
-            return add(x, y, z);
+                private $addZ(Integer y)
+                {
+                    this.y = y;
+                }
+
+                @Override
+                public Integer apply(final Integer z)
+                {
+                    return add(x, y, z);
+                }
+            }
         }
     }
 
