@@ -2,6 +2,7 @@ package lombok.eclipse;
 
 import static java.lang.Character.isUpperCase;
 import static java.lang.Character.toLowerCase;
+import static java.util.Arrays.asList;
 import static lombok.core.handlers.TransformationsUtil.toGetterName;
 import static lombok.eclipse.Eclipse.ECLIPSE_DO_NOT_TOUCH_FLAG;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
@@ -16,6 +17,7 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccS
 import static org.eclipse.jdt.internal.compiler.lookup.ExtraCompilerModifiers.AccVisibilityMASK;
 
 import java.util.Arrays;
+import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.core.AnnotationValues;
@@ -78,8 +80,7 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
         private final Source source;
         private final EclipseNode typeNode;
         private final String functionName;
-        private final TypeReference fromType, toType;
-        private final Expression application;
+        private final FunctionTypeBuilder functionTypeBuilder;
         private int modifiers;
 
         public FunctionBuilder(final EclipseNode target,
@@ -101,7 +102,6 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
             final String enclosingTypeName = target.up().getName();
             final TypeReference enclosingType =
                 source.generated(new SingleTypeReference(enclosingTypeName.toCharArray(), source.p));
-            final SingleNameReference fromReference = source.generated(new SingleNameReference("from".toCharArray(), source.p));
     
             if (target.getKind() == Kind.METHOD)
             {
@@ -120,10 +120,8 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                     if (method.arguments != null && method.arguments.length == 1)
                     {
                         functionName = createConstructorFunctionName(enclosingTypeName);
-                        fromType = createBoxedTypeReference(method.arguments[0].type);
-                        toType = enclosingType;
+                        functionTypeBuilder = new ConstructorFunctionTypeBuilder((ConstructorDeclaration)method, enclosingType);
                         modifiers |= AccStatic;
-                        application = createAllocation(enclosingType, fromReference);
                     }
                     else
                     {
@@ -133,17 +131,12 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                 }
                 else
                 {
-                    final Expression receiver, argument;
                     functionName = target.getName();
-                    toType = createBoxedTypeReference(((MethodDeclaration)method).returnType);
-
                     if ((modifiers & AccStatic) != 0)
                     {
                         if (method.arguments != null && method.arguments.length == 1)
                         {
-                            fromType = createBoxedTypeReference(method.arguments[0].type);
-                            receiver = source.generated(new SingleNameReference(enclosingTypeName.toCharArray(), source.p));
-                            argument = fromReference;
+                            functionTypeBuilder = new MethodCallFunctionTypeBuilder((MethodDeclaration)method, enclosingType);
                         }
                         else
                         {
@@ -156,23 +149,18 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                         // Instance method can have zero or one parameter
                         if (method.arguments == null || method.arguments.length == 0)
                         {
-                            fromType = enclosingType;
-                            receiver = fromReference;
-                            argument = null;
+                            functionTypeBuilder = new ThisCallFunctionTypeBuilder((MethodDeclaration)method, enclosingType);
                             modifiers |= AccStatic;
                         }
                         else if (method.arguments.length == 1)
                         {
-                            fromType = createBoxedTypeReference(method.arguments[0].type);
-                            receiver = source.generated(new QualifiedThisReference(enclosingType, source.pS, source.pE));
-                            argument = fromReference;
+                            functionTypeBuilder = new MethodCallFunctionTypeBuilder((MethodDeclaration)method, enclosingType);
                         }
                         else
                         {
                             throw new IllegalArgumentException("@AsFunction can only support one- or no-argument instance methods.");
                         }
                     }
-                    application = createMethodCall(receiver, method, argument);
                 }
             }
             else
@@ -182,14 +170,9 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                     throw new IllegalArgumentException("@AsFunction can only support instance fields.");
                 
                 modifiers = field.modifiers | AccStatic;
-                fromType = enclosingType;
-                toType = createBoxedTypeReference(field.type);
-                boolean isBoolean = Arrays.equals(field.type.getLastToken(), "boolean".toCharArray()) && toType.dimensions() == 0;
+                boolean isBoolean = Arrays.equals(field.type.getLastToken(), "boolean".toCharArray()) && field.type.dimensions() == 0;
                 functionName = toGetterName(target.getName(), isBoolean);
-                final FieldReference fieldRef = source.generated(new FieldReference(field.name, source.p));
-                fieldRef.receiver = fromReference;
-                fieldRef.token = field.name;
-                application = fieldRef;
+                functionTypeBuilder = new FieldAccessFunctionTypeBuilder(field, enclosingType);
             }
             if (access != AccessLevel.NONE)
                 modifiers = (modifiers & ~AccVisibilityMASK) | toEclipseModifier(access);
@@ -211,35 +194,15 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
             if (!typeHasClinit())
                 injectMethod(typeNode, source.generated(new Clinit(compilationResult)));
             
+            final TypeDeclaration functionType = functionTypeBuilder.build(compilationResult);
+            
             final FieldDeclaration functionField =
                 source.generated(new FieldDeclaration(functionName.toCharArray(), source.pS, source.pE));
             functionField.declarationSourceStart = functionField.sourceStart;
             functionField.declarationEnd = functionField.declarationSourceEnd = functionField.sourceEnd;
             functionField.modifiers = AccFinal | modifiers;
             functionField.bits |= ECLIPSE_DO_NOT_TOUCH_FLAG;
-            functionField.type = createFunctionInterfaceType();
-
-            final TypeDeclaration functionType = source.generated(new TypeDeclaration(compilationResult));
-            functionType.modifiers |= AccFinal | modifiers;
-            functionType.name = ("$" + functionName).toCharArray();
-            functionType.superInterfaces = new TypeReference[] {source.copyType(functionField.type, false)};
-            functionType.bodyStart = functionType.declarationSourceStart = functionType.sourceStart;
-            functionType.bodyEnd = functionType.declarationSourceEnd = functionType.sourceEnd;
-            
-            final MethodDeclaration applyMethod = source.generated(new MethodDeclaration(compilationResult));
-            applyMethod.modifiers |= AccPublic;
-            applyMethod.returnType = source.copyType(toType, false);
-            applyMethod.selector = "apply".toCharArray();
-            applyMethod.arguments = new Argument[] {createFromArg()};
-            applyMethod.bits |= ECLIPSE_DO_NOT_TOUCH_FLAG;
-            applyMethod.bodyStart = applyMethod.declarationSourceStart = applyMethod.sourceStart;
-            applyMethod.bodyEnd = applyMethod.declarationSourceEnd = applyMethod.sourceEnd;
-            
-            final Statement returnStatement = source.generated(new ReturnStatement(application, source.pS, source.pE));
-            applyMethod.statements = new Statement[] { returnStatement };
-            final ConstructorDeclaration defCon = source.generated(functionType.createDefaultConstructor(false, false));
-            defCon.bits |= ECLIPSE_DO_NOT_TOUCH_FLAG;
-            functionType.methods = new AbstractMethodDeclaration[] {defCon, applyMethod};
+            functionField.type = source.copyType(functionType.superInterfaces[0], false);
             
             final AllocationExpression allocateFunction = source.generated(new AllocationExpression());
             allocateFunction.type = source.generated(new SingleTypeReference(functionType.name, source.p));
@@ -248,7 +211,194 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
             injectType(functionType);
             injectField(typeNode, functionField);
         }
+        
+        private abstract class FunctionTypeBuilder
+        {
+            protected abstract TypeReference fromType();
+            protected abstract char[] fromName();
+            protected abstract TypeReference toType();
+            protected abstract Expression application();
+            
+            public TypeDeclaration build(CompilationResult compilationResult)
+            {
+                final TypeDeclaration functionType = source.generated(new TypeDeclaration(compilationResult));
+                functionType.modifiers |= AccFinal | modifiers;
+                functionType.name = ("$" + functionName).toCharArray();
+                functionType.superInterfaces = new TypeReference[] {createFunctionInterfaceType(fromType(), toType())};
+                functionType.bodyStart = functionType.declarationSourceStart = functionType.sourceStart;
+                functionType.bodyEnd = functionType.declarationSourceEnd = functionType.sourceEnd;
+                
+                final MethodDeclaration applyMethod = source.generated(new MethodDeclaration(compilationResult));
+                applyMethod.modifiers |= AccPublic;
+                applyMethod.returnType = toType();
+                applyMethod.selector = "apply".toCharArray();
+                applyMethod.arguments = new Argument[] {createFromArg(fromName(), fromType())};
+                applyMethod.bits |= ECLIPSE_DO_NOT_TOUCH_FLAG;
+                applyMethod.bodyStart = applyMethod.declarationSourceStart = applyMethod.sourceStart;
+                applyMethod.bodyEnd = applyMethod.declarationSourceEnd = applyMethod.sourceEnd;
+                
+                final Statement returnStatement = source.generated(new ReturnStatement(application(), source.pS, source.pE));
+                applyMethod.statements = new Statement[] { returnStatement };
+                final ConstructorDeclaration defCon = source.generated(functionType.createDefaultConstructor(false, false));
+                defCon.bits |= ECLIPSE_DO_NOT_TOUCH_FLAG;
+                functionType.methods = new AbstractMethodDeclaration[] {defCon, applyMethod};
+                
+                return functionType;
+            }
+        }
+        
+        private abstract class AbstractMultiArgumentFunctionTypeBuilder extends FunctionTypeBuilder
+        {
+            protected final List<Argument> arguments;
 
+            private AbstractMultiArgumentFunctionTypeBuilder(List<Argument> arguments)
+            {
+                this.arguments = arguments;
+            }
+
+            @Override
+            protected char[] fromName()
+            {
+                return arguments.get(0).name;
+            }
+
+            @Override
+            protected TypeReference fromType()
+            {
+                return createBoxedTypeReference(arguments.get(0).type);
+            }
+        }
+        
+        private class ConstructorFunctionTypeBuilder extends AbstractMultiArgumentFunctionTypeBuilder
+        {
+            private final TypeReference type;
+            
+            public ConstructorFunctionTypeBuilder(ConstructorDeclaration constructor,
+                                                  TypeReference type)
+            {
+                super(asList(constructor.arguments));
+                this.type = type;
+            }
+
+            @Override
+            protected Expression application()
+            {
+                return createAllocation(type, source.generated(new SingleNameReference(fromName(), source.p)));
+            }
+
+            @Override
+            protected TypeReference toType()
+            {
+                return type;
+            }
+        }
+        
+        private class MethodCallFunctionTypeBuilder extends AbstractMultiArgumentFunctionTypeBuilder
+        {
+            private final TypeReference type;
+            private final MethodDeclaration method;
+            
+            public MethodCallFunctionTypeBuilder(MethodDeclaration method,
+                                                 TypeReference type)
+            {
+                super(asList(method.arguments));
+                this.type = type;
+                this.method = method;
+            }
+
+            @Override
+            protected Expression application()
+            {
+                final SingleNameReference fromReference = source.generated(new SingleNameReference(fromName(), source.p));
+                final Expression receiver = source.generated((modifiers & AccStatic) != 0 ? 
+                        new SingleNameReference(type.getLastToken(), source.p) :
+                        new QualifiedThisReference(type, source.pS, source.pE));
+                return createMethodCall(receiver, method.selector, fromReference);
+            }
+
+            @Override
+            protected TypeReference toType()
+            {
+                return createBoxedTypeReference(method.returnType);
+            }
+        }
+        
+        private class ThisCallFunctionTypeBuilder extends FunctionTypeBuilder
+        {
+            private final TypeReference type;
+            private final MethodDeclaration method;
+            
+            public ThisCallFunctionTypeBuilder(MethodDeclaration method, TypeReference type)
+            {
+                this.type = type;
+                this.method = method;
+            }
+
+            @Override
+            protected Expression application()
+            {
+                final Expression receiver = source.generated(new SingleNameReference(fromName(), source.p));
+                return createMethodCall(receiver, method.selector, null);
+            }
+
+            @Override
+            protected char[] fromName()
+            {
+                return "from".toCharArray();
+            }
+
+            @Override
+            protected TypeReference fromType()
+            {
+                return type;
+            }
+
+            @Override
+            protected TypeReference toType()
+            {
+                return createBoxedTypeReference(method.returnType);
+            }
+        }
+        
+        private class FieldAccessFunctionTypeBuilder extends FunctionTypeBuilder
+        {
+            private final TypeReference type;
+            private final FieldDeclaration field;
+            
+            public FieldAccessFunctionTypeBuilder(FieldDeclaration field, TypeReference type)
+            {
+                this.type = type;
+                this.field = field;
+            }
+
+            @Override
+            protected Expression application()
+            {
+                final FieldReference fieldRef = source.generated(new FieldReference(field.name, source.p));
+                fieldRef.receiver = source.generated(new SingleNameReference(fromName(), source.p));
+                fieldRef.token = field.name;
+                return fieldRef;
+            }
+
+            @Override
+            protected char[] fromName()
+            {
+                return "from".toCharArray();
+            }
+
+            @Override
+            protected TypeReference fromType()
+            {
+                return type;
+            }
+
+            @Override
+            protected TypeReference toType()
+            {
+                return createBoxedTypeReference(field.type);
+            }
+        }
+        
         private String createConstructorFunctionName(final String enclosingTypeName)
         {
             final char firstLetter = enclosingTypeName.charAt(0);
@@ -304,7 +454,8 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
                     source.generated(new QualifiedTypeReference(boxedTypeConstant, source.p(3))) : source.copyType(rawType, false);
         }
 
-        private TypeReference createFunctionInterfaceType()
+        private TypeReference createFunctionInterfaceType(final TypeReference fromType,
+                                                          final TypeReference toType)
         {
             final char[][] tokens = fromQualifiedName("com.google.common.base.Function");
             final TypeReference[][] typeArguments = new TypeReference[tokens.length][];
@@ -315,20 +466,20 @@ public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
         }
     
         private MessageSend createMethodCall(final Expression receiver,
-                                             final AbstractMethodDeclaration method,
+                                             final char[] methodName,
                                              final Expression argument)
         {
             final MessageSend methodCall = source.generated(new MessageSend());
             methodCall.receiver = receiver;
-            methodCall.selector = method.selector;
+            methodCall.selector = methodName;
             methodCall.arguments = argument == null ? null : new Expression[] {argument};
             methodCall.statementEnd = methodCall.sourceEnd;
             return methodCall;
         }
     
-        private Argument createFromArg()
+        private Argument createFromArg(final char[] name, final TypeReference fromType)
         {
-            return source.generated(new Argument("from".toCharArray(),
+            return source.generated(new Argument(name,
                                                  source.p,
                                                  source.copyType(fromType, false),
                                                  AccFinal));
