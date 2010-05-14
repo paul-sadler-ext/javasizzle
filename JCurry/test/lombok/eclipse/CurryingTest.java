@@ -4,7 +4,7 @@ import static com.google.common.collect.Lists.transform;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertEquals;
 
-import org.jsizzle.AsFunction;
+import org.jcurry.AsFunction;
 import org.junit.Test;
 
 public class CurryingTest

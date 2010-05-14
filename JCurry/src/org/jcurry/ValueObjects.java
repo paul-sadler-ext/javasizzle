@@ -1,4 +1,4 @@
-package org.jsizzle;
+package org.jcurry;
 
 import static com.google.common.collect.Maps.filterKeys;
 import static com.google.common.collect.Sets.union;

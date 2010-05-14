@@ -1,4 +1,4 @@
-package org.jsizzle;
+package org.jcurry;
 
 import static com.google.common.base.Functions.identity;
 import static com.google.common.collect.Iterables.isEmpty;
@@ -13,7 +13,7 @@ import static java.util.Collections.singletonMap;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-import static org.jsizzle.ValueObjects.list;
+import static org.jcurry.ValueObjects.list;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -3,7 +3,7 @@ package org.jsizzle;
 import static com.google.common.base.Predicates.compose;
 import static com.google.common.collect.Iterables.all;
 import static org.jsizzle.Delta.deltas;
-import static org.jsizzle.ValueObjects.transform;
+import static org.jcurry.ValueObjects.transform;
 
 import org.jsizzle.JavaSpec.DefaultSuperTypeName;
 import org.jsizzle.JavaSpec.Modifier;

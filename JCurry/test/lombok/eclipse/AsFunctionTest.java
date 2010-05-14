@@ -3,7 +3,7 @@ package lombok.eclipse;
 import static junit.framework.Assert.assertEquals;
 import lombok.core.PrintAST;
 
-import org.jsizzle.AsFunction;
+import org.jcurry.AsFunction;
 import org.junit.Test;
 
 @PrintAST

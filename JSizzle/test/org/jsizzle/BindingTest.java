@@ -8,7 +8,7 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 import static org.jsizzle.InvariablesTest.bad;
-import static org.jsizzle.ValueObjects.list;
+import static org.jcurry.ValueObjects.list;
 import junit.framework.AssertionFailedError;
 
 import org.junit.Test;

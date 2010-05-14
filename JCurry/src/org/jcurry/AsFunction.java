@@ -1,4 +1,4 @@
-package org.jsizzle;
+package org.jcurry;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
