@@ -12,8 +12,8 @@ import static com.google.common.collect.Sets.union;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
-import static org.jsizzle.ValueObjects.list;
-import static org.jsizzle.ValueObjects.override;
+import static org.jcurry.ValueObjects.list;
+import static org.jcurry.ValueObjects.override;
 
 import java.util.List;
 import java.util.Map;

@@ -11,6 +11,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 
+import org.jcurry.AsFunction;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;

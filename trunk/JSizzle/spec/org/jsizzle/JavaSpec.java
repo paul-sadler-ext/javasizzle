@@ -3,9 +3,9 @@ package org.jsizzle;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.all;
 import static java.util.Collections.singleton;
-import static org.jsizzle.ValueObjects.contains;
-import static org.jsizzle.ValueObjects.only;
-import static org.jsizzle.ValueObjects.transform;
+import static org.jcurry.ValueObjects.contains;
+import static org.jcurry.ValueObjects.only;
+import static org.jcurry.ValueObjects.transform;
 
 import java.util.Collections;
 import java.util.EnumSet;

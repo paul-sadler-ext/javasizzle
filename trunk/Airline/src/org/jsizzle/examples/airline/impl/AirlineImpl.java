@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.jsizzle.AsFunction;
+import org.jcurry.AsFunction;
 import org.jsizzle.example.airline.AirlineSpec;
 import org.jsizzle.examples.airline.Airline;
 

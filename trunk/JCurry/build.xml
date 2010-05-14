@@ -1,20 +1,19 @@
-<project name="JSizzle" default="dist" basedir=".">
+<project name="JCurry" default="dist" basedir=".">
 	<description>
 		simple example build file
     </description>
 
 	<target name="dist" description="generate the distribution">
-		<jar destfile="jsizzle.jar">
+		<jar destfile="jcurry.jar">
 			<fileset dir="bin" />
 			<service type="lombok.eclipse.EclipseAnnotationHandler">
-				<provider classname="lombok.eclipse.HandleSchema" />
+				<provider classname="lombok.eclipse.HandleAsFunction" />
 			</service>
 		</jar>
-		<zip destfile="jsizzle-src.zip">
+		<zip destfile="jcurry-src.zip">
 			<fileset dir="src" />
-			<fileset dir="spec" />
 		</zip>
-		<copy file="jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
+		<copy file="jcurry.jar" tofile="C:/eclipse/jcurry.jar" />
 	</target>
 </project>
 

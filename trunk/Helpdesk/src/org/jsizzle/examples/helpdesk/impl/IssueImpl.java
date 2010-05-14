@@ -17,7 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.jsizzle.AsFunction;
+import org.jcurry.AsFunction;
 import org.jsizzle.Delta;
 import org.jsizzle.examples.helpdesk.HelpdeskSpec;
 import org.jsizzle.examples.helpdesk.Issue;

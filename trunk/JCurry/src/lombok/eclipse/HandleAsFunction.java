@@ -52,7 +52,7 @@ import org.eclipse.jdt.internal.compiler.ast.ThisReference;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.eclipse.jdt.internal.compiler.lookup.TypeConstants;
-import org.jsizzle.AsFunction;
+import org.jcurry.AsFunction;
 
 public class HandleAsFunction implements EclipseAnnotationHandler<AsFunction>
 {

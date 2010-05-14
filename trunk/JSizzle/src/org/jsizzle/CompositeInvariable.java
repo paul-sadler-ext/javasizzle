@@ -7,7 +7,7 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
-import static org.jsizzle.ValueObjects.uniques;
+import static org.jcurry.ValueObjects.uniques;
 
 import java.util.Set;
 import java.util.Map.Entry;

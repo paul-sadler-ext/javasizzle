@@ -7,7 +7,8 @@ import static com.google.common.collect.Maps.filterValues;
 import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static java.util.Arrays.asList;
-import static org.jsizzle.ValueObjects.domainRestrict;
+import static org.jcurry.ValueObjects.domainRestrict;
+import static org.jcurry.ValueObjects.transform;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -52,7 +53,7 @@ public class Delta<T> implements Iterable<T>
         final Map<? extends T, U> beforeToKey = domainRestrict(uniqueness, befores);
         final Map<U, ? extends T> keyToAfter = uniqueIndex(afters, uniqueness);
         final Map<? extends T, ? extends T> deltas = transformValues(filterValues(beforeToKey, in(keyToAfter.keySet())), forMap(keyToAfter));
-        return ValueObjects.transform(deltas.entrySet(), new Function<Entry<? extends T, ? extends T>, Delta<T>>()
+        return transform(deltas.entrySet(), new Function<Entry<? extends T, ? extends T>, Delta<T>>()
         {
             @Override
             public Delta<T> apply(Entry<? extends T, ? extends T> from)

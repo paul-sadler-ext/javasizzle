@@ -3,6 +3,8 @@ package org.jsizzle;
 import java.util.Set;
 import java.util.Map.Entry;
 
+import org.jcurry.AsFunction;
+
 import com.google.common.base.Predicate;
 
 public interface Invariable
