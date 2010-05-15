@@ -4,17 +4,17 @@
     </description>
 
 	<target name="dist" description="generate the distribution">
-		<jar destfile="jsizzle.jar">
+		<jar destfile="dist/jsizzle.jar">
 			<fileset dir="bin" />
 			<service type="lombok.eclipse.EclipseAnnotationHandler">
 				<provider classname="lombok.eclipse.HandleSchema" />
 			</service>
 		</jar>
-		<zip destfile="jsizzle-src.zip">
+		<zip destfile="dist/jsizzle-src.zip">
 			<fileset dir="src" />
 			<fileset dir="spec" />
 		</zip>
-		<copy file="jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
+		<copy file="dist/jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
 	</target>
 </project>
 
