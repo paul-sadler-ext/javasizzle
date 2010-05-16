@@ -49,8 +49,11 @@ import org.eclipse.jdt.internal.compiler.ast.IfStatement;
 import org.eclipse.jdt.internal.compiler.ast.MessageSend;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.OperatorIds;
+import org.eclipse.jdt.internal.compiler.ast.ParameterizedQualifiedTypeReference;
+import org.eclipse.jdt.internal.compiler.ast.QualifiedNameReference;
 import org.eclipse.jdt.internal.compiler.ast.QualifiedTypeReference;
 import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
+import org.eclipse.jdt.internal.compiler.ast.SingleTypeReference;
 import org.eclipse.jdt.internal.compiler.ast.Statement;
 import org.eclipse.jdt.internal.compiler.ast.StringLiteral;
 import org.eclipse.jdt.internal.compiler.ast.ThisReference;
@@ -64,6 +67,12 @@ import org.jsizzle.Schema;
 
 public class HandleSchema implements EclipseAnnotationHandler<Schema>
 {
+    private static final char[][] ORG_JSIZZLE_BINDING = fromQualifiedName("org.jsizzle.Binding");
+    private static final char[][] INCLUSION_DIRECT = fromQualifiedName("org.jsizzle.Binding.Inclusion.DIRECT");
+    private static final char[][] INCLUSION_INCLUDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.INCLUDED");
+    private static final char[][] INCLUSION_EXPANDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.EXPANDED");
+    private static final char[] IDENTITY_NAME = "identity".toCharArray();
+
     @Override
     public boolean handle(AnnotationValues<Schema> annotation,
                           Annotation source,
@@ -96,12 +105,15 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             if ((type.bits & IsMemberType) != 0)
                 type.modifiers |= AccStatic;
             
-            // Extend org.jsizzle.Binding
+            // Extend org.jsizzle.Binding<ThisType>
             if (type.superclass == null)
             {
-                type.superclass = source.generated(new QualifiedTypeReference(
-                    fromQualifiedName("org.jsizzle.Binding"),
-                    source.p(3)));
+                final TypeReference[][] typeArguments = new TypeReference[ORG_JSIZZLE_BINDING.length][];
+                typeArguments[ORG_JSIZZLE_BINDING.length - 1] =
+                    new TypeReference[] {source.generated(new SingleTypeReference(type.name, source.p))};
+                
+                type.superclass = source.generated(new ParameterizedQualifiedTypeReference(
+                    ORG_JSIZZLE_BINDING, typeArguments, 0, source.p(3)));
             }
             else
             {
@@ -127,7 +139,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                             // Generate the field access function
                             // NOTE: Do not use the child as source, due to use of retrieveEndOfElementTypeNamePosition
                             // in org.eclipse.jdt.core.dom.ASTConverter.convertType
-                            generateFunction(child, AccessLevel.PUBLIC, child, source);
+                            final char[] fieldAccessorName = generateFunction(child, AccessLevel.PUBLIC, child, source);
                             new HandleGetter().generateGetterForField(child, source.node);
                             
                             // If the field is initialised, leave it alone
@@ -163,17 +175,17 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                                                   AccPublic,
                                                                   source);
                                                 final EclipseNode fieldNode = typeNode.getNodeFor(includedField);
-                                                generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
+                                                final char[] expandedAccessorName = generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
                                                 new HandleGetter().generateGetterForField(fieldNode, source.node);
-                                                consBuilder.addAssignedField(includedField, false);
+                                                consBuilder.addAssignedField(includedField, expandedAccessorName, INCLUSION_EXPANDED);
                                             }
                                         }
                                     }
-                                    consBuilder.addConstructedField(field, includeCons);
+                                    consBuilder.addConstructedField(field, fieldAccessorName, INCLUSION_INCLUDED, includeCons);
                                 }
                                 else
                                 {
-                                    consBuilder.addAssignedField(field, true);
+                                    consBuilder.addAssignedField(field, fieldAccessorName, INCLUSION_DIRECT);
                                 }
                             }
                         }
@@ -217,7 +229,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             
             // If no fields, create an Object field for identity
             if (!consBuilder.hasArgs())
-                consBuilder.addAssignedField(injectIdentityField(typeNode, source), false);
+                consBuilder.addAssignedField(injectIdentityField(typeNode, source), null, null);
             
             // Inject the constructor and construction function
             final ConstructorDeclaration constructor = consBuilder.build();
@@ -274,10 +286,10 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     }
 
     private static FieldDeclaration injectIdentityField(final EclipseNode typeNode,
-                                                 final Source source)
+                                                        final Source source)
     {
         final TypeReference type = new QualifiedTypeReference(TypeConstants.JAVA_LANG_OBJECT, source.p(3));
-        return injectSchemaField(typeNode, "identity".toCharArray(), type, AccPrivate, source);
+        return injectSchemaField(typeNode, IDENTITY_NAME, type, AccPrivate, source);
     }
 
     private static FieldDeclaration injectSchemaField(final EclipseNode schemaNode,
@@ -328,18 +340,20 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             return constructor;
         }
 
-        public void addAssignedField(final FieldDeclaration field, boolean isData)
+        public void addAssignedField(final FieldDeclaration field, final char[] accessorName, final char[][] inclusion)
         {
             stmts.add(createFieldAssignment(field, createArgReference(field.name)));
             args.add(createArgument(field));
             final Statement nullCheck = generateNullCheck(field, source.node);
             if (nullCheck != null)
                 stmts.add(nullCheck);
-            if (isData)
-                stmts.add(createAddDatum(field));
+            if (accessorName != null)
+                stmts.add(createAddAccessor(accessorName, inclusion));
         }
 
         public void addConstructedField(final FieldDeclaration field,
+                                        final char[] accessorName,
+                                        final char[][] inclusion,
                                         final ConstructorDeclaration includeCons)
         {
             final AllocationExpression constructed = source.generated(new AllocationExpression());
@@ -356,7 +370,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             }
             stmts.add(createFieldAssignment(field, constructed));
 
-            stmts.add(createAddDatum(field));
+            stmts.add(createAddAccessor(accessorName, inclusion));
         }
 
         public void addInvariant(final AbstractMethodDeclaration method)
@@ -376,9 +390,14 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             return createThisCall("addViolation", new StringLiteral(method.selector, source.pS, source.pE, 0));
         }
 
-        private Statement createAddDatum(final FieldDeclaration field)
+        private Statement createAddAccessor(char[] accessorName, char[][] inclusion)
         {
-            return createThisCall("addDatum", createFieldReference(field.name));
+            final Expression accessorReference = source.generated(new SingleNameReference(accessorName, source.p));
+            final Expression inclusionReference = source.generated(new QualifiedNameReference(inclusion,
+                                                                                              source.p(inclusion.length),
+                                                                                              source.pS,
+                                                                                              source.pE));
+            return createThisCall("addAccessor", accessorReference, inclusionReference);
         }
 
         private Expression createThisCall(String methodName, Expression... arguments)
