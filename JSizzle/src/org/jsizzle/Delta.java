@@ -2,11 +2,9 @@ package org.jsizzle;
 
 import static com.google.common.base.Functions.forMap;
 import static com.google.common.base.Predicates.in;
-import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Maps.filterValues;
 import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
-import static java.util.Arrays.asList;
 import static org.jcurry.ValueObjects.domainRestrict;
 import static org.jcurry.ValueObjects.transform;
 
@@ -18,7 +16,6 @@ import java.util.Map.Entry;
 import lombok.Data;
 
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 
 @Data
@@ -27,16 +24,9 @@ public class Delta<T> implements Iterable<T>
     public final T before;
     public final T after;
     
-    public boolean unchanged(Function<T, ?>... functions)
+    public boolean unchanged(Function<T, ?> function)
     {
-        return all(asList(functions), new Predicate<Function<T, ?>>()
-        {
-            @Override
-            public boolean apply(Function<T, ?> function)
-            {
-                return function.apply(before).equals(function.apply(after));
-            }
-        });
+        return function.apply(before).equals(function.apply(after));
     }
     
     @SuppressWarnings("unchecked")
