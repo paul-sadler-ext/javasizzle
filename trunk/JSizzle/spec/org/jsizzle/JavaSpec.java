@@ -34,7 +34,7 @@ class JavaSpec
         Set<TypeName> annotations;
     }
     
-    enum TypeFlag { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
+    enum MetaType { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
     
     enum TypeScope { TOP, MEMBER }
     
@@ -44,7 +44,7 @@ class JavaSpec
     {
         @Include Modifiers modifiers;
         TypeName name;
-        TypeFlag flag;
+        MetaType metaType;
         TypeScope scope;
         Set<Variable> fields;
         Set<Constructor> constructors;
@@ -75,7 +75,7 @@ class JavaSpec
         
         @Invariant boolean modifiersAllowed()
         {
-            switch (flag)
+            switch (metaType)
             {
             case CLASS:
                 return only(EnumSet.of(Modifier.FINAL, Modifier.STATIC)).apply(otherModifiers);
@@ -86,7 +86,7 @@ class JavaSpec
         
         @Invariant boolean interfaceHasNoState()
         {
-            switch (flag)
+            switch (metaType)
             {
             case INTERFACE:
             case ANNOTATION:
@@ -98,7 +98,7 @@ class JavaSpec
         
         @Invariant boolean interfaceCannotBeConstructed()
         {
-            switch (flag)
+            switch (metaType)
             {
             case INTERFACE:
             case ANNOTATION:
@@ -110,7 +110,7 @@ class JavaSpec
         
         @Invariant boolean interfaceHasNoImplementation()
         {
-            switch (flag)
+            switch (metaType)
             {
             case INTERFACE:
             case ANNOTATION:
@@ -122,7 +122,7 @@ class JavaSpec
         
         @Invariant boolean hasAppropriateSuperType()
         {
-            switch (flag)
+            switch (metaType)
             {
             case ANNOTATION:
             case INTERFACE:
