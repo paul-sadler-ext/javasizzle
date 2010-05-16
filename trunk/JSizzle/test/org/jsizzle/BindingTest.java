@@ -1,5 +1,6 @@
 package org.jsizzle;
 
+import static com.google.common.base.Functions.compose;
 import static com.google.common.collect.Iterables.isEmpty;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Collections.singleton;
@@ -7,10 +8,11 @@ import static java.util.Collections.singletonList;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-import static org.jsizzle.InvariablesTest.bad;
 import static org.jcurry.ValueObjects.list;
+import static org.jsizzle.InvariablesTest.bad;
 import junit.framework.AssertionFailedError;
 
+import org.jcurry.AsFunction;
 import org.junit.Test;
 
 public class BindingTest
@@ -25,7 +27,7 @@ public class BindingTest
     }
     
     @Test
-    public void testIdentity()
+    public void testWithDatum()
     {
         assertTrue(withDatum.invariant());
         assertTrue(isEmpty(withDatum.getViolations()));
@@ -66,29 +68,89 @@ public class BindingTest
         withSubBindingViolation.checkInvariant();
     }
     
-    public static final Binding empty = new Binding() {};
-    public static final Binding withDatum = new Binding()
+    @Test
+    public void testWithInclusion()
     {
+        assertTrue(withInclusion.invariant());
+        assertTrue(isEmpty(withInclusion.getViolations()));
+        assertEquals(singletonList("Fred"), withInclusion.getData());
+        withDatum.checkInvariant();
+    }
+    
+    @Test(expected = AssertionFailedError.class)
+    public void testViolatingInclusion()
+    {
+        assertFalse(withViolatingInclusion.invariant());
+        assertEquals(singletonList(immutableEntry(withViolatingInclusion,
+                                                  singleton("invariantViolation"))),
+                     list(withViolatingInclusion.getViolations()));
+        assertEquals(singletonList(withInvariantViolation), withViolatingInclusion.getData());
+        withViolatingInclusion.checkInvariant();
+    }
+    
+    public static final MockBinding empty = new MockBinding() {};
+    
+    public static final class WithDatum extends Binding<WithDatum>
+    {
+        @AsFunction
+        private String datum = "Fred";
+        
         {
-            addDatum("Fred");
+            addAccessor(getDatum, Inclusion.DIRECT);
         }
-    };
-    public static final Binding withInvariantViolation = new Binding()
+    }
+    public static final WithDatum withDatum = new WithDatum();
+    
+    public static final MockBinding withInvariantViolation = new MockBinding()
     {
         {
             addViolation("invariantViolation");
         }
     };
-    public static final Binding withDatumViolation = new Binding()
+    
+    public static final class WithDatumViolation extends Binding<WithDatumViolation>
     {
+        @AsFunction
+        private Invariable datum = bad;
+        
         {
-            addDatum(bad);
+            addAccessor(getDatum, Inclusion.DIRECT);
         }
     };
-    public static final Binding withSubBindingViolation = new Binding()
+    public static final WithDatumViolation withDatumViolation = new WithDatumViolation();
+    
+    public static final class WithSubBindingViolation extends Binding<WithSubBindingViolation>
     {
+        @AsFunction
+        private MockBinding datum = withInvariantViolation;
+        
         {
-            addDatum(withInvariantViolation);
+            addAccessor(getDatum, Inclusion.DIRECT);
         }
     };
+    public static final WithSubBindingViolation withSubBindingViolation = new WithSubBindingViolation();
+    
+    public static final class WithInclusion extends Binding<WithInclusion>
+    {
+        @AsFunction
+        private WithDatum included = withDatum;
+        
+        {
+            addAccessor(compose(WithDatum.getDatum, getIncluded), Inclusion.EXPANDED);
+            addAccessor(getIncluded, Inclusion.INCLUDED);
+        }
+    };
+    public static final WithInclusion withInclusion = new WithInclusion();
+    
+    public static final class WithViolatingInclusion extends Binding<WithViolatingInclusion>
+    {
+        @AsFunction
+        private WithSubBindingViolation included = withSubBindingViolation;
+        
+        {
+            addAccessor(compose(WithSubBindingViolation.getDatum, getIncluded), Inclusion.EXPANDED);
+            addAccessor(getIncluded, Inclusion.INCLUDED);
+        }
+    };
+    public static final WithViolatingInclusion withViolatingInclusion = new WithViolatingInclusion();
 }

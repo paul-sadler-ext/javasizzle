@@ -85,9 +85,7 @@ public class MakeSchema
         
         @Invariant boolean signatureArgumentsAndStatementsUnchanged()
         {
-            return method.unchanged(Method.getSignature)
-                && method.unchanged(Method.getArguments)
-                && method.unchanged(Method.getStatements);
+            return method.unchangedExcept(Method.getVisibility, Method.getOtherModifiers);
         }
         
         @Invariant boolean becomesPrivateFinal()

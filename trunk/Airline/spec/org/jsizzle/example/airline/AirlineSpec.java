@@ -27,7 +27,7 @@ class AirlineSpec
     class Route
     {
         Location from, to;
-
+        
         @Invariant boolean notCircular()
         {
             return !from.equals(to);
