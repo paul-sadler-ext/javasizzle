@@ -7,7 +7,6 @@ import static org.jcurry.ValueObjects.contains;
 import static org.jcurry.ValueObjects.only;
 import static org.jcurry.ValueObjects.transform;
 
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -108,18 +107,6 @@ class JavaSpec
             }
         }
         
-        @Invariant boolean interfaceHasNoImplementation()
-        {
-            switch (metaType)
-            {
-            case INTERFACE:
-            case ANNOTATION:
-                return all(transform(methods, Method.getStatements), equalTo(Collections.<Statement>emptyList()));
-            default:
-                return true;
-            }
-        }
-        
         @Invariant boolean hasAppropriateSuperType()
         {
             switch (metaType)
@@ -139,7 +126,6 @@ class JavaSpec
     {
         @Include Modifiers modifiers;
         List<Variable> arguments;
-        List<Statement> statements;
 
         @Invariant boolean argumentsHaveAllowedModifiers()
         {
@@ -186,55 +172,5 @@ class JavaSpec
         @Include Modifiers modifiers;
         Name name;
         TypeName typeName;
-    }
-
-    interface Statement {}
-
-    interface Expression {}
-    
-    class If implements Statement
-    {
-        Expression condition;
-        Statement conditional;
-    }
-    
-    class VariableAccess implements Expression
-    {
-        Name variableName;
-    }
-    
-    class DoubleEquals implements Expression
-    {
-        Expression left, right;
-    }
-    
-    class Throw implements Statement
-    {
-        Expression throwable;
-    }
-    
-    class New implements Expression, Statement
-    {
-        TypeName typeName;
-        List<Expression> arguments;
-    }
-    
-    class Literal implements Expression {}
-    
-    class FieldAccess implements Expression
-    {
-        Name fieldName;
-    }
-    
-    class Assignment implements Expression, Statement
-    {
-        Expression assigned;
-        Expression value;
-    }
-    
-    class MethodCall implements Expression, Statement
-    {
-        Name methodName;
-        List<Expression> arguments;
     }
 }

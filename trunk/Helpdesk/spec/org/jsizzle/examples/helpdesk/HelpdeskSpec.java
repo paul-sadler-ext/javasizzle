@@ -107,13 +107,14 @@ class HelpdeskSpec
             Delta<Issue> issue;
             Analyst analyst;
             
+            @Invariant boolean onlyAnalystChanged()
+            {
+                return issue.unchangedExcept(Issue.getAnalyst);
+            }
+            
             @Invariant boolean analystSet()
             {
-                return issue.after.customer.equals(issue.before.customer) &&
-                       issue.after.analyst.equals(analyst) &&
-                       issue.after.references.equals(issue.before.references) &&
-                       issue.after.notes.equals(issue.before.notes) &&
-                       issue.after.status.equals(issue.before.status);
+                return issue.after.analyst.equals(analyst);
             }
         }
         
@@ -127,13 +128,14 @@ class HelpdeskSpec
                 return issue.before.analyst.equals(note.getAnalyst());
             }
             
+            @Invariant boolean onlyNotesChanged()
+            {
+                return issue.unchangedExcept(Issue.getNotes);
+            }
+            
             @Invariant boolean noteAdded()
             {
-                return issue.after.customer.equals(issue.before.customer) &&
-                       issue.after.analyst.equals(issue.before.analyst) &&
-                       issue.after.references.equals(issue.before.references) &&
-                       issue.after.notes.equals(list(concat(issue.before.notes, singleton(note)))) &&
-                       issue.after.status.equals(issue.before.status);
+                return issue.after.notes.equals(list(concat(issue.before.notes, singleton(note))));
             }
         }
         
@@ -142,13 +144,14 @@ class HelpdeskSpec
             Delta<Issue> issue;
             Id reference;
             
+            @Invariant boolean onlyReferencesChanged()
+            {
+                return issue.unchangedExcept(Issue.getReferences);
+            }
+            
             @Invariant boolean referenceAdded()
             {
-                return issue.after.customer.equals(issue.before.customer) &&
-                       issue.after.analyst.equals(issue.before.analyst) &&
-                       issue.after.references.equals(union(issue.before.references, singleton(reference))) &&
-                       issue.after.notes.equals(issue.before.notes) &&
-                       issue.after.status.equals(issue.before.status);
+                return issue.after.references.equals(union(issue.before.references, singleton(reference)));
             }
         }
         
@@ -156,13 +159,14 @@ class HelpdeskSpec
         {
             Delta<Issue> issue;
             
+            @Invariant boolean onlyStatusChanged()
+            {
+                return issue.unchangedExcept(Issue.getStatus);
+            }
+            
             @Invariant boolean closed()
             {
-                return issue.after.customer.equals(issue.before.customer) &&
-                       issue.after.analyst.equals(issue.before.analyst) &&
-                       issue.after.references.equals(issue.before.references) &&
-                       issue.after.notes.equals(issue.before.notes) &&
-                       issue.after.status.equals(Status.CLOSED);
+                return issue.after.status.equals(Status.CLOSED);
             }
         }
     }
