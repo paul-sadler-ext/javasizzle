@@ -1,13 +1,24 @@
 package org.jsizzle;
 
+import static com.google.common.base.Functions.compose;
+import static com.google.common.base.Functions.forMap;
 import static com.google.common.base.Predicates.compose;
 import static com.google.common.collect.Iterables.all;
+import static com.google.common.collect.Iterables.concat;
+import static com.google.common.collect.Sets.filter;
 import static com.google.common.collect.Sets.union;
 import static java.util.Collections.singleton;
+import static org.jcurry.ValueObjects.contains;
 import static org.jcurry.ValueObjects.flip;
+import static org.jcurry.ValueObjects.toSet;
 import static org.jcurry.ValueObjects.transform;
 import static org.jsizzle.Delta.deltas;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.jsizzle.JavaSpec.Constructor;
 import org.jsizzle.JavaSpec.DefaultSuperTypeName;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
@@ -23,14 +34,13 @@ import com.google.common.base.Function;
 
 /**
  * This specification models the transformation of the static syntax tree of a 
- * schema class from the source Java. The dynamic behaviour of an instance of
- * the schema class is modelled in {@link BindingSpec}.
+ * schema class from the source Java.
  */
 @Schema
 public class MakeSchema
 {
     Delta<Type> type;
-    Function<TypeName, Type> typeResolution;
+    Map<TypeName, Type> typeResolution;
     
     @Invariant boolean annotationsCannotBeSchemas()
     {
@@ -72,12 +82,22 @@ public class MakeSchema
     @Invariant boolean memberTypesBecomeSchemas()
     {
         return transform(type.after.memberTypes, Type.getName).equals(transform(type.before.memberTypes, Type.getName))
-            && all(deltas(type.before.memberTypes, type.after.memberTypes, Type.getName), compose(invariant, flip(makeSchema).apply(typeResolution)));
+                && all(deltas(type.before.memberTypes, type.after.memberTypes, Type.getName),
+                       compose(invariant, flip(makeSchema).apply(typeResolution)));
     }
     
-    @Invariant boolean noConstructorsAllowed()
+    @Invariant boolean noBeforeConstructorsAllowed()
     {
         return type.before.constructors.isEmpty();
+    }
+    
+    @Invariant boolean afterConstructorHasBeforeFieldsAsParameters()
+    {
+        return type.after.constructors.size() == 1
+                && getSchemaConstructor(type.after).visibility == Visibility.PUBLIC
+                && getSchemaConstructor(type.after).annotations.isEmpty()
+                && toSet(getSchemaConstructor(type.after).arguments).equals(type.before.fields)
+                && getSchemaConstructor(type.after).otherModifiers.isEmpty();
     }
     
     class MakeInvariantMethod
@@ -161,11 +181,29 @@ public class MakeSchema
         }
     }
     
+    @Invariant boolean includedFieldsMustBeResolved()
+    {
+        return typeResolution.keySet().containsAll(transform(getBeforeIncludedFields(), Variable.getTypeName));
+    }
+
+    Set<Variable> getBeforeIncludedFields()
+    {
+        return filter(type.before.fields, compose(contains(JSizzleTypeName.INCLUDE), Variable.getAnnotations));
+    }
+    
+    static Constructor getSchemaConstructor(Type schema)
+    {
+        return schema.constructors.iterator().next();
+    }
+    
     @Invariant boolean fieldsBecomeSchemaFields()
     {
+        final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
+            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(forMap(typeResolution), Variable.getTypeName)));
+        final Set<Variable> afterIncludedFields = toSet(concat(transform(getBeforeIncludedFields(), schemaConstructorArgsForTypeName)));
+        final Set<Variable> schemaFieldCandidates = union(type.before.fields, afterIncludedFields);
         
-        
-        return transform(type.after.fields, Variable.getName).containsAll(transform(type.before.fields, Variable.getName))
-            && all(deltas(type.before.fields, type.after.fields, Variable.getName), compose(invariant, MakeSchemaField.makeSchemaField));
+        return transform(type.after.fields, Variable.getName).equals(transform(schemaFieldCandidates, Variable.getName))
+            && all(deltas(schemaFieldCandidates, type.after.fields, Variable.getName), compose(invariant, MakeSchemaField.makeSchemaField));
     }
 }
