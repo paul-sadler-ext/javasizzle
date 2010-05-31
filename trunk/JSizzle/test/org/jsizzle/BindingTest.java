@@ -35,7 +35,7 @@ public class BindingTest
         withDatum.checkInvariant();
     }
     
-    @Test(expected = AssertionFailedError.class)
+    @Test(expected = IllegalStateException.class)
     public void testInvariantViolation()
     {
         assertFalse(withInvariantViolation.invariant());
@@ -46,7 +46,7 @@ public class BindingTest
         withInvariantViolation.checkInvariant();
     }
     
-    @Test(expected = AssertionFailedError.class)
+    @Test(expected = IllegalStateException.class)
     public void testDatumViolation()
     {
         assertFalse(withDatumViolation.invariant());
@@ -57,7 +57,7 @@ public class BindingTest
         withDatumViolation.checkInvariant();
     }
     
-    @Test(expected = AssertionFailedError.class)
+    @Test(expected = IllegalStateException.class)
     public void testSubBindingViolation()
     {
         assertFalse(withSubBindingViolation.invariant());

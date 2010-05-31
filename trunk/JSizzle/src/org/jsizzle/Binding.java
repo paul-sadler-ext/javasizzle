@@ -10,7 +10,6 @@ import static com.google.common.collect.Maps.filterValues;
 import static com.google.common.collect.Maps.immutableEntry;
 import static com.google.common.collect.Sets.filter;
 import static java.util.Collections.singleton;
-import static junit.framework.Assert.fail;
 import static org.jcurry.ValueObjects.list;
 import static org.jcurry.ValueObjects.transform;
 import static org.jsizzle.Invariables.and;
@@ -23,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
-
-import junit.framework.AssertionFailedError;
 
 import com.google.common.base.Function;
 
@@ -91,11 +88,11 @@ public abstract class Binding<T extends Binding<T>> implements Invariable
         return violations.isEmpty() && (disjoint ? or(invariables) : and(invariables)).invariant();
     }
 
-    public void checkInvariant() throws AssertionFailedError
+    public void checkInvariant() throws IllegalStateException
     {
         if (!invariant())
         {
-            fail(transform(getViolations(), new Function<Entry<? extends Invariable, Set<String>>, String>()
+            throw new IllegalStateException(transform(getViolations(), new Function<Entry<? extends Invariable, Set<String>>, String>()
             {
                 @Override
                 public String apply(Entry<? extends Invariable, Set<String>> from)
