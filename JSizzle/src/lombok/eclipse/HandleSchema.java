@@ -72,6 +72,9 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     private static final char[][] INCLUSION_INCLUDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.INCLUDED");
     private static final char[][] INCLUSION_EXPANDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.EXPANDED");
     private static final char[] IDENTITY_NAME = "identity".toCharArray();
+    
+    @SuppressWarnings("unused")
+    private static final boolean instrument = Boolean.valueOf(System.getProperty("org.jsizzle.instrument"));
 
     @Override
     public boolean handle(AnnotationValues<Schema> annotation,
