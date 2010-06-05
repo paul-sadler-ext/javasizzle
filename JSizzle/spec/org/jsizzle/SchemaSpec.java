@@ -79,12 +79,13 @@ public class SchemaSpec
         return all(type.memberTypes, compose(invariant, flip(schemaSpec).apply(typeResolution)));
     }
     
-    @Invariant boolean schemaConstructorHasUnincludedFieldsAsParameters()
+    @Invariant boolean schemaConstructorHasUnincludedAndExpandedFieldsAsParameters()
     {
         return type.constructors.size() == 1
                 && getSchemaConstructor(type).visibility == Visibility.PUBLIC
                 && getSchemaConstructor(type).annotations.isEmpty()
-                && namesAndTypes(getSchemaConstructor(type).arguments).equals(namesAndTypes(difference(type.fields, getIncludedFields())))
+                && namesAndTypes(getSchemaConstructor(type).arguments).equals(
+                    namesAndTypes(union(getExpandedFields(), difference(type.fields, getIncludedFields()))))
                 && getSchemaConstructor(type).otherModifiers.isEmpty();
     }
     
@@ -162,6 +163,13 @@ public class SchemaSpec
         return filter(type.fields, compose(contains(JSizzleTypeName.INCLUDE), Variable.getAnnotations));
     }
     
+    Set<Variable> getExpandedFields()
+    {
+        final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
+            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(forMap(typeResolution), Variable.getTypeName)));
+        return toSet(concat(transform(getIncludedFields(), schemaConstructorArgsForTypeName)));
+    }
+    
     static Constructor getSchemaConstructor(Type type)
     {
         return type.constructors.iterator().next();
@@ -174,9 +182,6 @@ public class SchemaSpec
     
     @Invariant boolean fieldsAreIncludedAndExpandedFields()
     {
-        final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
-            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(forMap(typeResolution), Variable.getTypeName)));
-        final Set<Variable> expandedFields = toSet(concat(transform(getIncludedFields(), schemaConstructorArgsForTypeName)));
-        return namesAndTypes(type.fields).equals(namesAndTypes(union(getIncludedFields(), expandedFields)));
+        return namesAndTypes(type.fields).equals(namesAndTypes(union(getIncludedFields(), getExpandedFields())));
     }
 }
