@@ -1,11 +1,11 @@
 package lombok.eclipse;
 
-import static java.util.Arrays.asList;
 import static lombok.eclipse.Eclipse.copyAnnotations;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Eclipse.toQualifiedName;
 import static lombok.eclipse.HandleAsFunction.generateFunction;
 import static lombok.eclipse.Source.source;
+import static lombok.eclipse.ast.AstUtilities.findLocalType;
 import static lombok.eclipse.handlers.EclipseHandlerUtil.fieldExists;
 import static lombok.eclipse.handlers.EclipseHandlerUtil.generateNullCheck;
 import static lombok.eclipse.handlers.EclipseHandlerUtil.getExistingLombokConstructor;
@@ -89,6 +89,8 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                     final Source source)
     {
         final TypeDeclaration type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
+        final CompilationUnitDeclaration compilationUnit = (CompilationUnitDeclaration)typeNode.top().get();
+
         
         // Entirely reject null types and annotations
         if (type == null || (type.modifiers & AccAnnotation) != 0)
@@ -151,7 +153,8 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                 final EclipseNode includeAnnNode = findAnnotation(child, Include.class);
                                 if (includeAnnNode != null)
                                 {
-                                    final EclipseNode includedTypeNode = findType(typeNode, asList(field.type.getTypeName()));
+                                    final TypeDeclaration localType = findLocalType(compilationUnit, type, field.type.getTypeName());
+                                    final EclipseNode includedTypeNode = typeNode.getNodeFor(localType);
                                     if (includedTypeNode == null)
                                     {
                                         includeAnnNode.addError("Local type " + toQualifiedName(field.type.getTypeName()) + " not found (may not be local).");
@@ -251,28 +254,6 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         }
 
         return true;
-    }
-
-    private static EclipseNode findType(EclipseNode scope, List<char[]> typeName)
-    {
-        final EclipseNode found = findTypeInScope(scope, typeName);
-        return found != null ? found : (scope.up() == null ? null : findType(scope.up(), typeName));
-    }
-
-    private static EclipseNode findTypeInScope(EclipseNode scope, List<char[]> typeName)
-    {
-        if (!typeName.isEmpty())
-        {
-            for (EclipseNode child : scope.down())
-            {
-                if (child.getKind() == Kind.TYPE)
-                {
-                    if (child.getName().equals(new String(typeName.get(0))))
-                        return typeName.size() == 1 ? child : findType(child, typeName.subList(1, typeName.size()));
-                }
-            }
-        }
-        return null;
     }
 
     private static EclipseNode findAnnotation(final EclipseNode node, final Class<? extends java.lang.annotation.Annotation> annClass)
