@@ -1,8 +1,8 @@
 package org.jsizzle;
 
 import static com.google.common.base.Functions.compose;
-import static com.google.common.base.Functions.forMap;
 import static com.google.common.base.Predicates.compose;
+import static com.google.common.base.Predicates.notNull;
 import static com.google.common.base.Predicates.or;
 import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Iterables.concat;
@@ -41,7 +41,7 @@ import com.google.common.base.Function;
 public class SchemaSpec
 {
     Type type;
-    Map<TypeName, Type> typeResolution;
+    Function<TypeName, Type> typeResolution;
 
     @Invariant boolean annotationsCannotBeSchemas()
     {
@@ -155,7 +155,7 @@ public class SchemaSpec
     
     @Invariant boolean includedFieldsMustBeResolved()
     {
-        return typeResolution.keySet().containsAll(transform(getIncludedFields(), Variable.getTypeName));
+        return all(transform(getIncludedFields(), Variable.getTypeName), compose(notNull(), typeResolution));
     }
 
     Set<Variable> getIncludedFields()
@@ -166,7 +166,7 @@ public class SchemaSpec
     Set<Variable> getExpandedFields()
     {
         final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
-            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(forMap(typeResolution), Variable.getTypeName)));
+            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(typeResolution, Variable.getTypeName)));
         return toSet(concat(transform(getIncludedFields(), schemaConstructorArgsForTypeName)));
     }
     

@@ -4,13 +4,13 @@ import static org.jcurry.ValueObjects.transform;
 import static org.jsizzle.SchemaSpec.namesAndTypes;
 import static org.jsizzle.SchemaSpec.schemaSpec;
 
-import java.util.Map;
-
-import org.jsizzle.JavaSpec.DefaultSuperTypeName;
+import org.jsizzle.JavaSpec.JavaLangTypeName;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
 import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.JavaSpec.TypeName;
+
+import com.google.common.base.Function;
 
 /**
  * This specification models the transformation of the static syntax tree of a 
@@ -20,7 +20,7 @@ import org.jsizzle.JavaSpec.TypeName;
 public class MakeSchema
 {
     Delta<Type> type;
-    Map<TypeName, Type> typeResolution;
+    Function<TypeName, Type> typeResolution;
     
     @SuppressWarnings("unchecked")
     @Invariant boolean expectedChanges()
@@ -42,7 +42,7 @@ public class MakeSchema
     @Invariant boolean beforeClassesMustExtendObject()
     {
         return type.before.metaType != MetaType.CLASS
-                || (type.before.superType == DefaultSuperTypeName.OBJECT);
+                || (type.before.superType == JavaLangTypeName.OBJECT);
     }
     
     @Invariant boolean noBeforeConstructorsAllowed()

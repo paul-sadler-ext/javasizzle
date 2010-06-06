@@ -20,11 +20,11 @@ class JavaSpec
     
     interface TypeName {}
     
-    enum PrimitiveName implements TypeName { VOID, BYTE, SHORT, INTEGER, LONG, CHAR, BOOLEAN, DOUBLE, FLOAT }
+    enum PrimitiveName implements TypeName { VOID, BYTE, SHORT, INT, LONG, CHAR, BOOLEAN, DOUBLE, FLOAT }
     
     enum Visibility { DEFAULT, PRIVATE, PROTECTED, PUBLIC }
     
-    enum Modifier { FINAL, STATIC, VOLATILE, TRANSIENT }
+    enum Modifier { FINAL, STATIC }
     
     class Modifiers
     {
@@ -37,7 +37,7 @@ class JavaSpec
     
     enum TypeScope { TOP, MEMBER }
     
-    enum DefaultSuperTypeName implements TypeName { OBJECT, ENUM, NONE }
+    enum JavaLangTypeName implements TypeName { OBJECT, ENUM, NONE }
     
     class Type
     {
@@ -113,11 +113,11 @@ class JavaSpec
             {
             case ANNOTATION:
             case INTERFACE:
-                return superType == DefaultSuperTypeName.NONE;
+                return superType == JavaLangTypeName.NONE;
             case ENUMERATION:
-                return superType == DefaultSuperTypeName.ENUM;
+                return superType == JavaLangTypeName.ENUM;
             default:
-                return superType != DefaultSuperTypeName.NONE;
+                return superType != JavaLangTypeName.NONE;
             }
         }
     }
@@ -158,8 +158,8 @@ class JavaSpec
 
     class Method
     {
-        @Include Signature signature;
         @Include Procedure procedure;
+        @Include Signature signature;
         
         @Invariant boolean argumentsMatchSignature()
         {
