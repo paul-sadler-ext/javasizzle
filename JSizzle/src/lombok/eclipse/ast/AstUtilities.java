@@ -17,7 +17,7 @@ public class AstUtilities
                                               CompilationUnitDeclaration compilationUnit)
     {
         final LinkedList<char[]> qName = new LinkedList<char[]>();
-        for (TypeDeclaration up = type; up != null; up = type.enclosingType)
+        for (TypeDeclaration up = type; up != null; up = up.enclosingType)
             qName.addFirst(up.name);
         return toArray(concat(asList(compilationUnit.currentPackage.getImportName()), qName), char[].class);
     }
@@ -31,7 +31,7 @@ public class AstUtilities
 
     private static TypeDeclaration findTypeDown(CompilationUnitDeclaration compilationUnit, TypeDeclaration[] types, List<char[]> typeName)
     {
-        if (!typeName.isEmpty())
+        if (!typeName.isEmpty() && types != null)
         {
             for (TypeDeclaration type : types)
             {

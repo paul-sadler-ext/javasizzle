@@ -28,6 +28,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
+import lombok.eclipse.ast.JavaSpecMapping;
 import lombok.eclipse.handlers.HandleEqualsAndHashCode;
 import lombok.eclipse.handlers.HandleGetter;
 import lombok.eclipse.handlers.HandleToString;
@@ -63,7 +64,10 @@ import org.eclipse.jdt.internal.compiler.ast.UnaryExpression;
 import org.eclipse.jdt.internal.compiler.lookup.TypeConstants;
 import org.jsizzle.Include;
 import org.jsizzle.Invariant;
+import org.jsizzle.MakeSchema;
 import org.jsizzle.Schema;
+import org.jsizzle.SchemaSpec;
+import org.jsizzle.JavaSpec.Type;
 
 public class HandleSchema implements EclipseAnnotationHandler<Schema>
 {
@@ -73,7 +77,6 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     private static final char[][] INCLUSION_EXPANDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.EXPANDED");
     private static final char[] IDENTITY_NAME = "identity".toCharArray();
     
-    @SuppressWarnings("unused")
     private static final boolean instrument = Boolean.valueOf(System.getProperty("org.jsizzle.instrument"));
 
     @Override
@@ -81,7 +84,16 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                           Annotation source,
                           EclipseNode annotationNode)
     {
-        return makeSchemaClass(annotationNode.up(), annotationNode, source(source));
+        final Instrumentation instrumentation = instrument ? new Instrumentation(annotationNode.up()) : null;
+        try
+        {
+            return makeSchemaClass(annotationNode.up(), annotationNode, source(source));
+        }
+        finally
+        {
+            if (instrumentation != null)
+                instrumentation.after();
+        }
     }
     
     private boolean makeSchemaClass(final EclipseNode typeNode,
@@ -90,7 +102,6 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     {
         final TypeDeclaration type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
         final CompilationUnitDeclaration compilationUnit = (CompilationUnitDeclaration)typeNode.top().get();
-
         
         // Entirely reject null types and annotations
         if (type == null || (type.modifiers & AccAnnotation) != 0)
@@ -421,6 +432,26 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         private SingleNameReference createArgReference(final char[] name)
         {
             return source.generated(new SingleNameReference(name, source.p));
+        }
+    }
+    
+    private class Instrumentation
+    {
+        private final TypeDeclaration type;
+        private final JavaSpecMapping javaSpecMapping;
+        private final Type specTypeBefore;
+        
+        public Instrumentation(EclipseNode typeNode)
+        {
+            this.type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
+            this.javaSpecMapping = new JavaSpecMapping((CompilationUnitDeclaration)typeNode.top().get());
+            this.specTypeBefore = javaSpecMapping.specType(type);
+        }
+        
+        public void after()
+        {
+            final Type specTypeAfter = javaSpecMapping.specType(type);
+            new MakeSchema(specTypeBefore, new SchemaSpec(specTypeAfter, javaSpecMapping.typeForName)).checkInvariant();
         }
     }
 }

@@ -114,10 +114,8 @@ class JavaSpec
             case ANNOTATION:
             case INTERFACE:
                 return superType == JavaLangTypeName.NONE;
-            case ENUMERATION:
-                return superType == JavaLangTypeName.ENUM;
             default:
-                return superType != JavaLangTypeName.NONE;
+                return true;
             }
         }
     }
