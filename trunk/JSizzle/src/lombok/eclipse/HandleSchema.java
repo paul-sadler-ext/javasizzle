@@ -62,9 +62,9 @@ import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.eclipse.jdt.internal.compiler.ast.UnaryExpression;
 import org.eclipse.jdt.internal.compiler.lookup.TypeConstants;
+import org.jsizzle.Delta;
 import org.jsizzle.Include;
 import org.jsizzle.Invariant;
-import org.jsizzle.MakeSchema;
 import org.jsizzle.Schema;
 import org.jsizzle.SchemaSpec;
 import org.jsizzle.JavaSpec.Type;
@@ -92,7 +92,16 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         finally
         {
             if (instrumentation != null)
-                instrumentation.after();
+            {
+                try
+                {
+                    instrumentation.after();
+                }
+                catch (IllegalStateException e)
+                {
+                    annotationNode.addError(e.getMessage());
+                }
+            }
         }
     }
     
@@ -448,10 +457,10 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             this.specTypeBefore = javaSpecMapping.specType(type);
         }
         
-        public void after()
+        public void after() throws IllegalStateException
         {
             final Type specTypeAfter = javaSpecMapping.specType(type);
-            new MakeSchema(specTypeBefore, new SchemaSpec(specTypeAfter, javaSpecMapping.typeForName)).checkInvariant();
+            new SchemaSpec(new Delta<Type>(specTypeBefore, specTypeAfter), javaSpecMapping.typeForName).checkInvariant();
         }
     }
 }

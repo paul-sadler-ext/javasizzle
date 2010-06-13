@@ -35,6 +35,7 @@ import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.jcurry.AsFunction;
+import org.jsizzle.Binding;
 import org.jsizzle.Include;
 import org.jsizzle.Invariant;
 import org.jsizzle.JavaSpec.Constructor;
@@ -52,9 +53,9 @@ import org.jsizzle.JavaSpec.Visibility;
 import org.jsizzle.SchemaSpec.JSizzleTypeName;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.sun.xml.internal.org.jvnet.staxex.NamespaceContextEx.Binding;
 
 public class JavaSpecMapping
 {
@@ -105,7 +106,7 @@ public class JavaSpecMapping
                         specMetaType(type.modifiers),
                         type.enclosingType != null ? TypeScope.MEMBER : TypeScope.TOP,
                         specSet(type.fields, specVariable.apply(type)),
-                        specSet(type.methods, specConstructor.apply(type), ConstructorDeclaration.class),
+                        specConstructors(type),
                         specSet(type.methods, specMethod.apply(type), MethodDeclaration.class),
                         specSet(type.memberTypes, specType),
                         specReference(type.enclosingType, type.superclass),
@@ -142,24 +143,6 @@ public class JavaSpecMapping
                             new Name(new String(variable.name)),
                             specReference(scope, variable.type));
     }
-
-    public <A, S> Set<S> specSet(A[] astns, Function<A, S> specA)
-    {
-        final Set<S> noSpecs = emptySet();
-        return astns == null ? noSpecs : newHashSet(transform(asList(astns), specA));
-    }
-    
-    public <A, D extends A, S> Set<S> specSet(A[] astns, Function<D, S> specA, Class<D> typeD)
-    {
-        final Set<S> noSpecs = emptySet();
-        return astns == null ? noSpecs : newHashSet(transform(filter(asList(astns), typeD), specA));
-    }
-    
-    public <A, S> List<S> specList(A[] astns, Function<A, S> specA)
-    {
-        final List<S> noSpecs = emptyList();
-        return astns == null ? noSpecs : newArrayList(transform(asList(astns), specA));
-    }
     
     @AsFunction
     public TypeName specAnnotation(TypeDeclaration scope, Annotation annotation)
@@ -168,9 +151,9 @@ public class JavaSpecMapping
     }
     
     @AsFunction
-    public TypeName specReference(TypeDeclaration scope, TypeReference implemented)
+    public TypeName specReference(TypeDeclaration scope, TypeReference reference)
     {
-        return specTypeName(scope, implemented == null ? null : implemented.getTypeName());
+        return specTypeName(scope, reference == null ? null : reference.getTypeName());
     }
     
     public TypeName specTypeName(TypeDeclaration scope, final char[][] localName)
@@ -184,8 +167,74 @@ public class JavaSpecMapping
         final String key = qualifiedName == null ? null : toQualifiedName(qualifiedName);
         TypeName typeName = typeNames.get(key);
         if (typeName == null)
-            typeNames.put(key, typeName = new TypeName() {});
+        {
+            typeNames.put(key, typeName = new TypeName()
+            {
+                @Override
+                public String toString()
+                {
+                    return key;
+                }
+            });
+        }
         return typeName;
+    }
+
+    private static <A, S> Set<S> specSet(A[] astns, Function<A, S> specA)
+    {
+        if (astns == null)
+        {
+            return emptySet();
+        }
+        else
+        {
+            return newHashSet(transform(asList(astns), specA));
+        }
+    }
+    
+    private static <A, D extends A, S> Set<S> specSet(A[] astns, Function<D, S> specA, final Class<D> typeD)
+    {
+        if (astns == null)
+        {
+            return emptySet();
+        }
+        else
+        {
+            return newHashSet(transform(filter(asList(astns), typeD), specA));
+        }
+    }
+    
+    private static <A, S> List<S> specList(A[] astns, Function<A, S> specA)
+    {
+        if (astns == null)
+        {
+            return emptyList();
+        }
+        else
+        {
+            return newArrayList(transform(asList(astns), specA));
+        }
+    }
+
+    private Set<Constructor> specConstructors(TypeDeclaration type)
+    {
+        if (type.methods == null)
+        {
+            return emptySet();
+        }
+        else
+        {
+            final Iterable<ConstructorDeclaration> constructors =
+                filter(filter(asList(type.methods), ConstructorDeclaration.class), new Predicate<ConstructorDeclaration>()
+            {
+                @Override
+                public boolean apply(ConstructorDeclaration input)
+                {
+                    return !input.isDefaultConstructor();
+                }
+            });
+            return newHashSet(transform(constructors, specConstructor.apply(type)));
+        }
     }
 
     private static Set<Modifier> specOtherModifiers(final int modifiers)
