@@ -86,6 +86,11 @@ public class SchemaSpec
                 || type.after.otherModifiers.contains(Modifier.FINAL);
     }
     
+    @Initialise Set<SchemaSpec> memberSchemas()
+    {
+        return transform(deltas(type.before.memberTypes, type.after.memberTypes, Type.getName), flip(schemaSpec).apply(typeResolution));
+    }
+
     @Invariant boolean memberSchemasAreStatic()
     {
         return type.after.metaType != MetaType.CLASS
@@ -104,12 +109,6 @@ public class SchemaSpec
     @Invariant boolean allMemberTypesRetained()
     {
         return transform(type.after.memberTypes, Type.getName).containsAll(transform(type.before.memberTypes, Type.getName));
-    }
-    
-    @Invariant boolean memberTypesAreSchemas()
-    {
-        return all(deltas(type.before.memberTypes, type.after.memberTypes, Type.getName),
-                   compose(invariant, flip(schemaSpec).apply(typeResolution)));
     }
     
     class InitSchemaConstructor
@@ -213,13 +212,12 @@ public class SchemaSpec
     {
         return transform(type.after.methods, Method.getSignature).containsAll(transform(type.after.methods, Method.getSignature));
     }
-    
-    @Invariant boolean methodsAreSchemaMethods()
+
+    @Initialise Set<SchemaMethod> memberSchemaMethods()
     {
-        return all(deltas(type.before.methods, type.after.methods, Method.getSignature),
-                   compose(invariant, SchemaMethod.schemaMethod));
+        return transform(deltas(type.before.methods, type.after.methods, Method.getSignature), SchemaMethod.schemaMethod);
     }
-    
+
     class SchemaField
     {
         Delta<Variable> field;
@@ -263,13 +261,13 @@ public class SchemaSpec
         return namesAndTypes(type.after.fields).entrySet().containsAll(namesAndTypes(type.before.fields).entrySet());
     }
     
-    @Invariant boolean fieldsAreSchemaFields()
-    {
-        return all(deltas(type.before.fields, type.after.fields, Variable.getName), compose(invariant, SchemaField.schemaField));
-    }
-    
     @Invariant boolean fieldsIncludeIncludedAndExpandedFields()
     {
         return namesAndTypes(type.after.fields).entrySet().containsAll(namesAndTypes(union(getIncludedFields(), getExpandedFields())).entrySet());
+    }
+    
+    @Initialise Set<SchemaField> schemaFields()
+    {
+        return transform(deltas(type.before.fields, type.after.fields, Variable.getName), SchemaField.schemaField);
     }
 }
