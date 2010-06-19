@@ -177,10 +177,8 @@ class IssueImpl implements Issue
                 throws IllegalStateException
         {
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.addNote(analyst, text);
             new HelpdeskSpec.AddIssueNote(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                          new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                           specId(),
                                           specNote(analyst, text)).checkInvariant();
         }
@@ -190,10 +188,8 @@ class IssueImpl implements Issue
                 throws IllegalStateException
         {
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.addNote(analyst, data);
             new HelpdeskSpec.AddIssueNote(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                          new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                           specId(),
                                           specNote(analyst, data)).checkInvariant();
         }
@@ -203,10 +199,8 @@ class IssueImpl implements Issue
                 throws IllegalStateException
         {
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.addNote(analyst, resolution);
             new HelpdeskSpec.AddIssueNote(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                          new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                           specId(),
                                           specNote(analyst, resolution)).checkInvariant();
         }
@@ -218,10 +212,8 @@ class IssueImpl implements Issue
                 ref = ((Instrumented)ref).asIssueImpl();
             
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.addReference(ref);
             new HelpdeskSpec.AddIssueReference(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                               new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                                specId(),
                                                ((IssueImpl)ref).specId()).checkInvariant();
         }
@@ -230,10 +222,8 @@ class IssueImpl implements Issue
         public void close() throws IllegalStateException
         {
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.close();
             new HelpdeskSpec.CloseIssue(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                        new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                         specId()).checkInvariant();
         }
 
@@ -271,10 +261,8 @@ class IssueImpl implements Issue
         public void setAnalyst(Person analyst)
         {
             final HelpdeskSpec helpdeskBefore = helpdesk.specHelpdesk();
-            final HelpdeskSpec.Issue issueBefore = specIssue();
             IssueImpl.this.setAnalyst(analyst);
             new HelpdeskSpec.SetIssueAnalyst(new Delta<HelpdeskSpec>(helpdeskBefore, helpdesk.specHelpdesk()),
-                                             new Delta<HelpdeskSpec.Issue>(issueBefore, specIssue()),
                                              specId(),
                                              specAnalyst(analyst)).checkInvariant();
         }

@@ -21,6 +21,7 @@ import java.util.Set;
 
 import org.jsizzle.Delta;
 import org.jsizzle.Include;
+import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
 import org.jsizzle.Prime;
 import org.jsizzle.Schema;
@@ -174,23 +175,12 @@ class HelpdeskSpec
     class PromoteIssue
     {
         Delta<HelpdeskSpec> helpdesk;
-        Delta<Issue> issue;
         Id id;
+        Delta<Issue> issue;
         
         @Invariant boolean issuesUpdated()
         {
             return helpdesk.after.issues.equals(override(helpdesk.before.issues, singletonMap(id, issue.after)));
-        }
-    }
-    
-    class PromoteExistingIssue
-    {
-        @Include PromoteIssue promoteIssue;
-        
-        @Invariant boolean mustBeExistingIssue()
-        {
-            return helpdesk.before.issues.containsKey(id) &&
-                   helpdesk.before.issues.get(id).equals(issue.before);
         }
     }
 
@@ -202,6 +192,22 @@ class HelpdeskSpec
         @Invariant boolean mustBeNewIssue()
         {
             return !helpdesk.before.issues.containsKey(id);
+        }
+    }
+    
+    class PromoteExistingIssue
+    {
+        @Include PromoteIssue promoteIssue;
+        
+        @Initialise Delta<Issue> issue()
+        {
+            return new Delta<Issue>(helpdesk.before.issues.get(id), helpdesk.after.issues.get(id));
+        }
+        
+        @Invariant boolean mustBeExistingIssue()
+        {
+            return helpdesk.before.issues.containsKey(id) &&
+                   helpdesk.before.issues.get(id).equals(issue.before);
         }
     }
     
