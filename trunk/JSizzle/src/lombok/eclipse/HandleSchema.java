@@ -1,5 +1,9 @@
 package lombok.eclipse;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.disjoint;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static lombok.eclipse.Eclipse.copyAnnotations;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Eclipse.toQualifiedName;
@@ -23,7 +27,13 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccS
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import lombok.AccessLevel;
 import lombok.core.AnnotationValues;
@@ -36,6 +46,7 @@ import lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.AllocationExpression;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.Argument;
@@ -47,6 +58,8 @@ import org.eclipse.jdt.internal.compiler.ast.Expression;
 import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.FieldReference;
 import org.eclipse.jdt.internal.compiler.ast.IfStatement;
+import org.eclipse.jdt.internal.compiler.ast.LocalDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.MarkerAnnotation;
 import org.eclipse.jdt.internal.compiler.ast.MessageSend;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.OperatorIds;
@@ -64,19 +77,23 @@ import org.eclipse.jdt.internal.compiler.ast.UnaryExpression;
 import org.eclipse.jdt.internal.compiler.lookup.TypeConstants;
 import org.jsizzle.Delta;
 import org.jsizzle.Include;
+import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
 import org.jsizzle.Schema;
+import org.jsizzle.SchemaField;
 import org.jsizzle.SchemaSpec;
 import org.jsizzle.JavaSpec.Type;
 
 public class HandleSchema implements EclipseAnnotationHandler<Schema>
 {
     private static final char[][] ORG_JSIZZLE_BINDING = fromQualifiedName("org.jsizzle.Binding");
+    private static final char[][] ORG_JSIZZLE_SCHEMAFIELD = fromQualifiedName("org.jsizzle.SchemaField");
     private static final char[][] INCLUSION_DIRECT = fromQualifiedName("org.jsizzle.Binding.Inclusion.DIRECT");
     private static final char[][] INCLUSION_INCLUDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.INCLUDED");
     private static final char[][] INCLUSION_EXPANDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.EXPANDED");
     private static final char[] IDENTITY_NAME = "identity".toCharArray();
-    
+    private static final List<Argument> noArgs = emptyList();
+
     private static final boolean instrument = Boolean.valueOf(System.getProperty("org.jsizzle.instrument"));
 
     @Override
@@ -173,8 +190,8 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                 final EclipseNode includeAnnNode = findAnnotation(child, Include.class);
                                 if (includeAnnNode != null)
                                 {
-                                    final TypeDeclaration localType = findLocalType(compilationUnit, type, field.type.getTypeName());
-                                    final EclipseNode includedTypeNode = typeNode.getNodeFor(localType);
+                                    final TypeDeclaration includedType = findLocalType(compilationUnit, type, field.type.getTypeName());
+                                    final EclipseNode includedTypeNode = typeNode.getNodeFor(includedType);
                                     if (includedTypeNode == null)
                                     {
                                         includeAnnNode.addError("Local type " + toQualifiedName(field.type.getTypeName()) + " not found (may not be local).");
@@ -187,31 +204,33 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                         break;
                                     }
                                     final ConstructorDeclaration includeCons = (ConstructorDeclaration)includeConsNode.get();
-                                    if (includeCons.arguments != null)
+                                    consBuilder.addIncludedField(field, includeCons, fieldAccessorName);
+                                    injectAnnotation(child, createSchemaFieldAnnotation(source));
+                                    
+                                    for (AbstractVariableDeclaration variableToInclude : variablesToInclude(includedTypeNode, includeCons))
                                     {
-                                        for (Argument arg : includeCons.arguments)
+                                        if (fieldExists(new String(variableToInclude.name), typeNode) == MemberExistsResult.NOT_EXISTS)
                                         {
-                                            if (fieldExists(new String(arg.name), typeNode) == MemberExistsResult.NOT_EXISTS)
-                                            {
-                                                // NOTE: Must set source positions on copied type, because for some reason Eclipse
-                                                // doesn't like argument types with source positions from a different scope.
-                                                final FieldDeclaration includedField = injectSchemaField(typeNode,
-                                                                  arg.name,
-                                                                  source.copyType(arg.type, true),
-                                                                  AccPublic,
-                                                                  source);
-                                                final EclipseNode fieldNode = typeNode.getNodeFor(includedField);
-                                                final char[] expandedAccessorName = generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
-                                                new HandleGetter().generateGetterForField(fieldNode, source.node);
-                                                consBuilder.addAssignedField(includedField, expandedAccessorName, INCLUSION_EXPANDED);
-                                            }
+                                            // NOTE: Must set source positions on copied type, because for some reason Eclipse
+                                            // doesn't like argument types with source positions from a different scope.
+                                            final FieldDeclaration expandedField = injectSchemaField(typeNode,
+                                                             variableToInclude.name,
+                                                             source.copyType(variableToInclude.type, true),
+                                                             AccPublic,
+                                                             source);
+                                            final EclipseNode fieldNode = typeNode.getNodeFor(expandedField);
+                                            final char[] expandedAccessorName =
+                                                generateFunction(fieldNode, AccessLevel.PUBLIC, child, source);
+                                            new HandleGetter().generateGetterForField(fieldNode, source.node);
+                                            consBuilder.addExpandedField(expandedField, field, expandedAccessorName);
+                                            injectAnnotation(fieldNode, createSchemaFieldAnnotation(source));
                                         }
                                     }
-                                    consBuilder.addConstructedField(field, fieldAccessorName, INCLUSION_INCLUDED, includeCons);
                                 }
                                 else
                                 {
-                                    consBuilder.addAssignedField(field, fieldAccessorName, INCLUSION_DIRECT);
+                                    consBuilder.addDirectField(field, fieldAccessorName);
+                                    injectAnnotation(child, createSchemaFieldAnnotation(source));
                                 }
                             }
                         }
@@ -222,10 +241,11 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                         if (method instanceof ConstructorDeclaration)
                         {
                             if ((method.bits & ASTNode.IsDefaultConstructor) == 0)
-                                typeNode.getNodeFor(method).addWarning("Schema classes should not have constructors.");
+                                child.addWarning("Schema classes should not have constructors.");
                         }
                         else if (method instanceof MethodDeclaration)
                         {
+                            // Invariant methods are marked with @Invariant
                             final EclipseNode invariantAnnNode = findAnnotation(child, Invariant.class);
                             if (invariantAnnNode != null)
                             {
@@ -234,19 +254,43 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
                                 {
                                     // Make invariant method private final
                                     method.modifiers |= (AccPrivate | AccFinal);
-                                    consBuilder.addInvariant(method);
+                                    consBuilder.addInvariant((MethodDeclaration)method);
                                 }
                                 else
                                 {
-                                    typeNode.getNodeFor(method).addError("Invariant method must have no arguments and return a boolean.");
+                                    child.addError("Invariant method must have no arguments and return a boolean.");
                                 }
                             }
                             else
                             {
-                                // Make utility method public final
-                                method.modifiers |= (AccPublic | AccFinal);
-                                // Generate the method access function
-                                generateFunction(child, AccessLevel.PUBLIC, child, source);
+                                // Initialiser methods are marked with @Initialise
+                                final EclipseNode initialiseAnnNode = findAnnotation(child, Initialise.class);
+                                if (initialiseAnnNode != null)
+                                {
+                                    // Find the field to be initialised
+                                    final EclipseNode fieldNode = findField(typeNode, child.getName());
+                                    if (fieldNode == null)
+                                    {
+                                        child.addError("Cannot find field to be initialised.");
+                                    }
+                                    else if (method.arguments != null && method.arguments.length > 0)
+                                    {
+                                        child.addError("Initialiser cannot have arguments.");
+                                    }
+                                    else
+                                    {
+                                        // Make initialiser method private final
+                                        method.modifiers |= (AccPrivate | AccFinal);
+                                        consBuilder.addInitialiser(fieldNode.getName(), (MethodDeclaration)method);
+                                    }
+                                }
+                                else
+                                {
+                                    // Make utility method public final
+                                    method.modifiers |= (AccPublic | AccFinal);
+                                    // Generate the method access function
+                                    generateFunction(child, AccessLevel.PUBLIC, child, source);
+                                }
                             }
                         }
                     }
@@ -254,8 +298,8 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             }
             
             // If no fields, create an Object field for identity
-            if (!consBuilder.hasArgs())
-                consBuilder.addAssignedField(injectIdentityField(typeNode, source), null, null);
+            if (!consBuilder.hasFields())
+                consBuilder.addDirectField(injectIdentityField(typeNode, source), null);
             
             // Inject the constructor and construction function
             final ConstructorDeclaration constructor = consBuilder.build();
@@ -274,6 +318,46 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         }
 
         return true;
+    }
+
+    private static List<AbstractVariableDeclaration> variablesToInclude(EclipseNode includedTypeNode,
+                                                                        ConstructorDeclaration includeCons)
+    {
+        // Return the constructor arguments, then any additional fields
+        final List<AbstractVariableDeclaration> variables = new ArrayList<AbstractVariableDeclaration>(
+                includeCons.arguments != null ? asList(includeCons.arguments) : noArgs);
+        
+        children: for (EclipseNode child : includedTypeNode.down())
+        {
+            if (child.getKind() == Kind.FIELD
+                    && findAnnotation(child, SchemaField.class) != null
+                    && findAnnotation(child, Include.class) == null)
+            {
+                for (AbstractVariableDeclaration variable : variables)
+                {
+                    if (Arrays.equals(variable.name, child.getName().toCharArray()))
+                        continue children;
+                }
+                variables.add((FieldDeclaration)child.get());
+            }
+        }
+        return variables;
+    }
+
+    private static MarkerAnnotation createSchemaFieldAnnotation(final Source source)
+    {
+        final QualifiedTypeReference schemaFieldType = source.generated(new QualifiedTypeReference(ORG_JSIZZLE_SCHEMAFIELD, source.p(3)));
+        return source.generated(new MarkerAnnotation(schemaFieldType, source.pS));
+    }
+    
+    private static EclipseNode findField(final EclipseNode typeNode, final String name)
+    {
+        for (EclipseNode fieldNode : typeNode.down())
+        {
+            if (fieldNode.getKind() == Kind.FIELD && fieldNode.getName().equals(name))
+                return fieldNode;
+        }
+        return null;
     }
 
     private static EclipseNode findAnnotation(final EclipseNode node, final Class<? extends java.lang.annotation.Annotation> annClass)
@@ -312,12 +396,57 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         return field;
     }
     
+    /**
+     * Inserts an annotation into an existing variable. The variable node must represent an {@code
+     * AbstractVariableDeclaration}.
+     */
+    private static void injectAnnotation(EclipseNode variable, Annotation annotation)
+    {
+        final AbstractVariableDeclaration parent = (AbstractVariableDeclaration)variable.get();
+        if (parent.annotations == null)
+        {
+            parent.annotations = new Annotation[1];
+            parent.annotations[0] = annotation;
+        }
+        else
+        {
+            Annotation[] newArray = new Annotation[parent.annotations.length + 1];
+            System.arraycopy(parent.annotations, 0, newArray, 0, parent.annotations.length);
+            newArray[parent.annotations.length] = annotation;
+            parent.annotations = newArray;
+        }
+        variable.add(annotation, Kind.ANNOTATION).recursiveSetHandled();
+    }
+
     private class ConstructorBuilder
     {
         final EclipseNode type;
         final Source source;
-        final List<Argument> args = new ArrayList<Argument>();
-        final List<Statement> stmts = new ArrayList<Statement>();
+        final Map<String, LocalDeclaration> initialisers = new HashMap<String, LocalDeclaration>();
+        final List<FieldAssignment> fieldAssignments = new ArrayList<FieldAssignment>();
+        final List<Statement> otherStatements = new ArrayList<Statement>();
+        
+        private class FieldAssignment
+        {
+            public final char[] fieldName;
+            public final Statement statement;
+            public final Map<String, Argument> requiredArguments = new LinkedHashMap<String, Argument>();
+            
+            public FieldAssignment(FieldDeclaration field)
+            {
+                this(field.name, createNameReference(field.name), singletonList(createArgument(field)));
+            }
+            
+            public FieldAssignment(char[] fieldName, Expression value, Collection<Argument> requiredArguments)
+            {
+                this.fieldName = fieldName;
+                final FieldReference thisX = createFieldReference(fieldName);
+                this.statement = source.generated(new Assignment(thisX, value, source.pE));
+
+                for (Argument argument : requiredArguments)
+                    this.requiredArguments.put(new String(argument.name), argument);
+            }
+        }
         
         public ConstructorBuilder(EclipseNode type, Source source)
         {
@@ -339,29 +468,54 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             constructor.bits |= Eclipse.ECLIPSE_DO_NOT_TOUCH_FLAG;
             constructor.bodyStart = constructor.declarationSourceStart = constructor.sourceStart;
             constructor.bodyEnd = constructor.declarationSourceEnd = constructor.sourceEnd;
+            
+            final List<Statement> stmts = new ArrayList<Statement>();
+            final Map<String, Argument> args = new LinkedHashMap<String, Argument>();
+            final Set<String> alreadyInitialised = new HashSet<String>();
+            for (FieldAssignment assignment : fieldAssignments)
+            {
+                // If any argument is initialised, include the initialiser statement and remove it
+                final Map<String, Argument> requiredArguments = new LinkedHashMap<String, Argument>(assignment.requiredArguments);
+                if (!disjoint(initialisers.keySet(), requiredArguments.keySet()))
+                {
+                    // Remove any arguments that have an initialiser
+                    final Set<String> initialised = new HashSet<String>(requiredArguments.keySet());
+                    initialised.retainAll(initialisers.keySet());
+                    requiredArguments.keySet().removeAll(initialised);
+                    
+                    // Include any initialisation statement that hasn't already been included
+                    initialised.removeAll(alreadyInitialised);
+                    for (String name : initialised)
+                        stmts.add(initialisers.get(name));
+                    alreadyInitialised.addAll(initialised);
+                }
+                args.putAll(requiredArguments);
+                stmts.add(assignment.statement);
+            }
+            stmts.addAll(otherStatements);
+            
             constructor.statements = stmts.isEmpty() ? null : stmts.toArray(new Statement[stmts.size()]);
-            constructor.arguments = args.isEmpty() ? null : args.toArray(new Argument[args.size()]);
+            constructor.arguments = args.isEmpty() ? null : args.values().toArray(new Argument[args.size()]);
             return constructor;
         }
 
-        public void addAssignedField(final FieldDeclaration field, final char[] accessorName, final char[][] inclusion)
+        public void addDirectField(final FieldDeclaration field, final char[] accessorName)
         {
-            stmts.add(createFieldAssignment(field, createArgReference(field.name)));
-            args.add(createArgument(field));
+            fieldAssignments.add(new FieldAssignment(field));
+            addAccessor(accessorName, INCLUSION_DIRECT);
+            
             final Statement nullCheck = generateNullCheck(field, source.node);
             if (nullCheck != null)
-                stmts.add(nullCheck);
-            if (accessorName != null)
-                stmts.add(createAddAccessor(accessorName, inclusion));
+                otherStatements.add(nullCheck);
         }
 
-        public void addConstructedField(final FieldDeclaration field,
-                                        final char[] accessorName,
-                                        final char[][] inclusion,
-                                        final ConstructorDeclaration includeCons)
+        public void addIncludedField(final FieldDeclaration field,
+                                     final ConstructorDeclaration includeCons,
+                                     final char[] accessorName)
         {
             final AllocationExpression constructed = source.generated(new AllocationExpression());
             constructed.type = source.copyType(field.type, false);
+            final List<Argument> requiredArguments = new ArrayList<Argument>();
             if (includeCons.arguments == null)
             {
                 constructed.arguments = null;
@@ -370,23 +524,84 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             {
                 constructed.arguments = new Expression[includeCons.arguments.length];
                 for (int i = 0; i < includeCons.arguments.length; i++)
-                    constructed.arguments[i] = createArgReference(includeCons.arguments[i].name);
+                {
+                    if (findFieldAssignment(includeCons.arguments[i].name) > -1)
+                    {
+                        // If the field already exists (hiding), then use its value.
+                        constructed.arguments[i] = createFieldReference(includeCons.arguments[i].name);
+                    }
+                    else
+                    {
+                        // Otherwise demand an argument.
+                        constructed.arguments[i] = createNameReference(includeCons.arguments[i].name);
+                        requiredArguments.add(createArgument(includeCons.arguments[i]));
+                    }
+                }
             }
-            stmts.add(createFieldAssignment(field, constructed));
-
-            stmts.add(createAddAccessor(accessorName, inclusion));
+            fieldAssignments.add(new FieldAssignment(field.name, constructed, requiredArguments));
+            addAccessor(accessorName, INCLUSION_INCLUDED);
         }
 
-        public void addInvariant(final AbstractMethodDeclaration method)
+        public void addExpandedField(FieldDeclaration field,
+                                     FieldDeclaration includedField,
+                                     char[] accessorName)
+        {
+            final int indexIncluded = findFieldAssignment(includedField.name);
+            if (fieldAssignments.get(indexIncluded).requiredArguments.containsKey(new String(field.name)))
+            {
+                // Expanded fields that are in the included field's constructor are bumped up.
+                // This is because they may be referenced by an initialiser for another field.
+                fieldAssignments.add(indexIncluded, new FieldAssignment(field));
+            }
+            else
+            {
+                // Expanded fields that are not in the included field's constructor must be initialised
+                // from the constructed field's unexpanded field. If these are referenced by an initialiser
+                // for another field, this can lead to unavoidable NPEs.
+                final FieldReference copyFrom = source.generated(new FieldReference(
+                    (new String(includedField.name) + "." + new String(field.name)).toCharArray(), source.p));
+                copyFrom.receiver = createFieldReference(includedField.name);
+                copyFrom.token = field.name;
+                fieldAssignments.add(new FieldAssignment(field.name, copyFrom, noArgs));
+            }
+            addAccessor(accessorName, INCLUSION_EXPANDED);
+        }
+
+        public void addInitialiser(final String fieldName, final MethodDeclaration method)
+        {
+            final LocalDeclaration declaration = source.generated(new LocalDeclaration(fieldName.toCharArray(), source.pS, source.pE));
+            declaration.type = source.copyType(method.returnType, false);
+            declaration.modifiers |= AccFinal;
+            declaration.initialization = createThisCall(new String(method.selector));
+            initialisers.put(fieldName, declaration);
+        }
+        
+        public void addInvariant(final MethodDeclaration method)
         {
             final Expression callInvariant = createThisCall(new String(method.selector));
             final UnaryExpression notInvariant = source.generated(new UnaryExpression(callInvariant, OperatorIds.NOT));
-            stmts.add(source.generated(new IfStatement(notInvariant, createAddViolation(method), source.pS, source.pE)));
+            otherStatements.add(source.generated(new IfStatement(notInvariant, createAddViolation(method), source.pS, source.pE)));
         }
         
-        public boolean hasArgs()
+        public boolean hasFields()
         {
-            return !args.isEmpty();
+            return !fieldAssignments.isEmpty();
+        }
+        
+        private int findFieldAssignment(char[] fieldName)
+        {
+            for (int i = 0; i < fieldAssignments.size(); i++)
+            {
+                if (Arrays.equals(fieldName, fieldAssignments.get(i).fieldName))
+                    return i;
+            }
+            return -1;
+        }
+
+        private void addAccessor(final char[] accessorName, final char[][] inclusion)
+        {
+            if (accessorName != null)
+                otherStatements.add(createAddAccessor(accessorName, inclusion));
         }
 
         private Statement createAddViolation(final AbstractMethodDeclaration method)
@@ -413,22 +628,16 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             return methodCall;
         }
 
-        private Argument createArgument(final FieldDeclaration field)
+        private Argument createArgument(final AbstractVariableDeclaration var)
         {
-            final Argument argument = source.generated(new Argument(field.name,
+            final Argument argument = source.generated(new Argument(var.name,
                                                                     source.p,
-                                                                    source.copyType(field.type, false),
+                                                                    source.copyType(var.type, false),
                                                                     AccFinal));
-            argument.annotations = copyAnnotations(field.annotations, source.node);
+            argument.annotations = copyAnnotations(var.annotations, source.node);
             return argument;
         }
     
-        private Assignment createFieldAssignment(final FieldDeclaration field, final Expression value)
-        {
-            final FieldReference thisX = createFieldReference(field.name);
-            return source.generated(new Assignment(thisX, value, source.pE));
-        }
-
         private FieldReference createFieldReference(final char[] name)
         {
             final FieldReference thisX = source.generated(new FieldReference(
@@ -438,7 +647,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             return thisX;
         }
 
-        private SingleNameReference createArgReference(final char[] name)
+        private SingleNameReference createNameReference(final char[] name)
         {
             return source.generated(new SingleNameReference(name, source.p));
         }

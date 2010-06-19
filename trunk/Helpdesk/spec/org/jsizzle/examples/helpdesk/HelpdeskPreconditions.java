@@ -2,7 +2,9 @@ package org.jsizzle.examples.helpdesk;
 
 import java.util.Collections;
 
+import org.jsizzle.Include;
 import org.jsizzle.Prime;
+import org.jsizzle.Schema;
 import org.jsizzle.examples.helpdesk.HelpdeskSpec.Analyst;
 import org.jsizzle.examples.helpdesk.HelpdeskSpec.Customer;
 import org.jsizzle.examples.helpdesk.HelpdeskSpec.Id;
@@ -23,5 +25,17 @@ public class HelpdeskPreconditions
                                                   Status.OPEN)),
                        new Customer("Fred"),
                        new Analyst("Barney")).checkInvariant();
+    }
+    
+    @Schema
+    class Fred
+    {
+        int x;
+    }
+    
+    @Schema
+    class Wilma
+    {
+        @Include Fred fred;
     }
 }
