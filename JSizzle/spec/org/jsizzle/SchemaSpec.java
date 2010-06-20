@@ -75,6 +75,11 @@ public class SchemaSpec
         return type.before.metaType != MetaType.ANNOTATION;
     }
     
+    @Invariant boolean markedAsASchema()
+    {
+        return type.after.annotations.contains(JSizzleTypeName.SCHEMA);
+    }
+    
     @Invariant boolean schemasArePublic()
     {
         return type.after.visibility == Visibility.PUBLIC;
@@ -98,7 +103,7 @@ public class SchemaSpec
                 || type.after.otherModifiers.contains(Modifier.STATIC);
     }
     
-    enum JSizzleTypeName implements TypeName { BINDING, INCLUDE, INVARIANT };
+    enum JSizzleTypeName implements TypeName { SCHEMA, BINDING, INCLUDE, INVARIANT, INITIALISE, SCHEMAFIELD };
     
     @Invariant boolean schemasExtendBinding()
     {
@@ -111,7 +116,11 @@ public class SchemaSpec
         return transform(type.after.memberTypes, Type.getName).containsAll(transform(type.before.memberTypes, Type.getName));
     }
     
-    class InitSchemaConstructor
+    interface SchemaConstructor {}
+    
+    enum SchemaConstructors implements SchemaConstructor { NO_CONSTRUCTOR }
+    
+    class InitSchemaClassConstructor implements SchemaConstructor
     {
         Prime<Constructor> constructor;
         Map<Name, TypeName> arguments;
@@ -137,11 +146,23 @@ public class SchemaSpec
         }
     }
     
-    @Invariant boolean schemaConstructorHasUnincludedAndExpandedFieldsAsParameters()
+    @Invariant boolean onlyOneConstructor()
     {
-        final Map<Name, TypeName> arguments = namesAndTypes(union(getExpandedFields(), difference(type.before.fields, getIncludedFields())));
-        return type.after.constructors.size() == 1
-                && new InitSchemaConstructor(new Prime<Constructor>(getSchemaConstructor(type.after)), arguments).invariant();
+        return type.after.metaType != MetaType.CLASS
+                || type.after.constructors.size() == 1;
+    }
+    
+    @Initialise SchemaConstructor schemaConstructor()
+    {
+        if (type.after.metaType == MetaType.CLASS)
+        {
+            final Map<Name, TypeName> arguments = namesAndTypes(union(getExpandedFields(), difference(type.before.fields, getIncludedFields())));
+            return new InitSchemaClassConstructor(new Prime<Constructor>(getSchemaClassConstructor(type.after)), arguments);
+        }
+        else
+        {
+            return SchemaConstructors.NO_CONSTRUCTOR;
+        }
     }
     
     static Map<JavaSpec.Name, TypeName> namesAndTypes(Iterable<Variable> variables)
@@ -224,13 +245,18 @@ public class SchemaSpec
         
         @Invariant boolean onlyModifiersChanged()
         {
-            return field.unchangedExcept(Variable.getOtherModifiers, Variable.getVisibility);
+            return field.unchangedExcept(Variable.getOtherModifiers, Variable.getVisibility, Variable.getAnnotations);
         }
         
         @Invariant boolean isPublicFinal()
         {
             return field.after.visibility.equals(Visibility.PUBLIC)
                     && field.after.otherModifiers.equals(union(field.before.otherModifiers, singleton(Modifier.FINAL)));
+        }
+        
+        @Invariant boolean hasSchemaFieldAnnotation()
+        {
+            return field.after.annotations.equals(union(field.before.annotations, singleton(JSizzleTypeName.SCHEMAFIELD)));
         }
     }
     
@@ -247,11 +273,11 @@ public class SchemaSpec
     Set<Variable> getExpandedFields()
     {
         final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
-            compose(Constructor.getArguments, compose(getSchemaConstructor, compose(typeResolution, Variable.getTypeName)));
+            compose(Constructor.getArguments, compose(getSchemaClassConstructor, compose(typeResolution, Variable.getTypeName)));
         return toSet(concat(transform(getIncludedFields(), schemaConstructorArgsForTypeName)));
     }
     
-    static Constructor getSchemaConstructor(Type type)
+    static Constructor getSchemaClassConstructor(Type type)
     {
         return type.constructors.iterator().next();
     }

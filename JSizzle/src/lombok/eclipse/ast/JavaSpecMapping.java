@@ -23,9 +23,14 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccP
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccPublic;
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccStatic;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import lombok.core.TypeLibrary;
+import lombok.core.TypeResolver;
+import lombok.eclipse.EclipseNode;
 
 import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
@@ -37,7 +42,10 @@ import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.jcurry.AsFunction;
 import org.jsizzle.Binding;
 import org.jsizzle.Include;
+import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
+import org.jsizzle.Schema;
+import org.jsizzle.SchemaField;
 import org.jsizzle.JavaSpec.Constructor;
 import org.jsizzle.JavaSpec.JavaLangTypeName;
 import org.jsizzle.JavaSpec.MetaType;
@@ -59,12 +67,28 @@ import com.google.common.collect.HashBiMap;
 
 public class JavaSpecMapping
 {
+    private static final TypeLibrary typeLibrary = new TypeLibrary();
+    static
+    {
+        typeLibrary.addType(Schema.class.getName());
+        typeLibrary.addType(Binding.class.getName());
+        typeLibrary.addType(Include.class.getName());
+        typeLibrary.addType(Invariant.class.getName());
+        typeLibrary.addType(Initialise.class.getName());
+        typeLibrary.addType(SchemaField.class.getName());
+        typeLibrary.addType(Object.class.getName());
+        typeLibrary.addType(Enum.class.getName());
+    }
+    
     private static final Map<String, TypeName> fixedTypeNames = newHashMap();
     static
     {
+        fixedTypeNames.put(Schema.class.getName(), JSizzleTypeName.SCHEMA);
         fixedTypeNames.put(Binding.class.getName(), JSizzleTypeName.BINDING);
         fixedTypeNames.put(Include.class.getName(), JSizzleTypeName.INCLUDE);
         fixedTypeNames.put(Invariant.class.getName(), JSizzleTypeName.INVARIANT);
+        fixedTypeNames.put(Initialise.class.getName(), JSizzleTypeName.INITIALISE);
+        fixedTypeNames.put(SchemaField.class.getName(), JSizzleTypeName.SCHEMAFIELD);
         fixedTypeNames.put(Object.class.getName(), JavaLangTypeName.OBJECT);
         fixedTypeNames.put(Enum.class.getName(), JavaLangTypeName.ENUM);
         fixedTypeNames.put(null, JavaLangTypeName.NONE);
@@ -79,10 +103,12 @@ public class JavaSpecMapping
     }
     private final BiMap<String, TypeName> typeNames = HashBiMap.create(fixedTypeNames);
     private final CompilationUnitDeclaration compilationUnit;
+    private final TypeResolver resolver;
     
-    public JavaSpecMapping(CompilationUnitDeclaration compilationUnit)
+    public JavaSpecMapping(EclipseNode start)
     {
-        this.compilationUnit = compilationUnit;
+        this.compilationUnit = (CompilationUnitDeclaration)start.top().get();
+        this.resolver = new TypeResolver(typeLibrary, start.getPackageDeclaration(), start.getImportStatements());
     }
     
     @AsFunction
@@ -158,8 +184,23 @@ public class JavaSpecMapping
     
     public TypeName specTypeName(TypeDeclaration scope, final char[][] localName)
     {
-        final TypeDeclaration localType = localName == null ? null : findLocalType(compilationUnit, scope, localName);
-        return specClassName(localType == null ? localName : fullyQualifiedName(localType, compilationUnit));
+        if (localName == null)
+        {
+            return specClassName(null);
+        }
+        else
+        {
+            final TypeDeclaration localType = findLocalType(compilationUnit, scope, localName);
+            if (localType != null)
+            {
+                return specClassName(fullyQualifiedName(localType, compilationUnit));
+            }
+            else
+            {
+                final Iterator<String> matches = resolver.findTypeMatches(null, toQualifiedName(localName)).iterator();
+                return specClassName(matches.hasNext() ? fromQualifiedName(matches.next()) : localName);
+            }
+        }
     }
     
     public TypeName specClassName(final char[][] qualifiedName)
