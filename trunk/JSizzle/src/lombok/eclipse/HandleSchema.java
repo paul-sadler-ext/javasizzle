@@ -86,6 +86,7 @@ import org.jsizzle.JavaSpec.Type;
 public class HandleSchema implements EclipseAnnotationHandler<Schema>
 {
     private static final char[][] ORG_JSIZZLE_BINDING = fromQualifiedName("org.jsizzle.Binding");
+    private static final char[][] ORG_JSIZZLE_SCHEMA = fromQualifiedName("org.jsizzle.Schema");
     private static final char[][] ORG_JSIZZLE_SCHEMAFIELD = fromQualifiedName("org.jsizzle.SchemaField");
     private static final char[][] INCLUSION_DIRECT = fromQualifiedName("org.jsizzle.Binding.Inclusion.DIRECT");
     private static final char[][] INCLUSION_INCLUDED = fromQualifiedName("org.jsizzle.Binding.Inclusion.INCLUDED");
@@ -137,6 +138,14 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         
         // Make class public
         type.modifiers |= AccPublic;
+        
+        // If not marked as a Schema (may be implied), do so
+        if (findAnnotation(typeNode, Schema.class) == null)
+        {
+            final QualifiedTypeReference schemaType = source.generated(new QualifiedTypeReference(ORG_JSIZZLE_SCHEMA, source.p(3)));
+            injectAnnotation(typeNode, source.generated(new MarkerAnnotation(schemaType, source.pS)));
+        }
+
         
         // For enumerations and interfaces, we don't do anything more
         if ((type.modifiers & (AccInterface | AccEnum)) == 0)
@@ -408,25 +417,32 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     }
     
     /**
-     * Inserts an annotation into an existing variable. The variable node must represent an {@code
-     * AbstractVariableDeclaration}.
+     * Inserts an annotation into an existing node. The node must represent an {@code
+     * AbstractVariableDeclaration} or a {@code TypeDeclaration}.
      */
-    private static void injectAnnotation(EclipseNode variable, Annotation annotation)
+    private static void injectAnnotation(EclipseNode node, Annotation annotation)
     {
-        final AbstractVariableDeclaration parent = (AbstractVariableDeclaration)variable.get();
-        if (parent.annotations == null)
+        final Annotation[] oldArray = node.getKind() == Kind.TYPE ?
+                ((TypeDeclaration)node.get()).annotations : ((AbstractVariableDeclaration)node.get()).annotations;
+        
+        final Annotation[] newArray;
+        if (oldArray == null)
         {
-            parent.annotations = new Annotation[1];
-            parent.annotations[0] = annotation;
+            newArray = new Annotation[1];
+            newArray[0] = annotation;
         }
         else
         {
-            Annotation[] newArray = new Annotation[parent.annotations.length + 1];
-            System.arraycopy(parent.annotations, 0, newArray, 0, parent.annotations.length);
-            newArray[parent.annotations.length] = annotation;
-            parent.annotations = newArray;
+            newArray = new Annotation[oldArray.length + 1];
+            System.arraycopy(oldArray, 0, newArray, 0, oldArray.length);
+            newArray[oldArray.length] = annotation;
         }
-        variable.add(annotation, Kind.ANNOTATION).recursiveSetHandled();
+        if (node.getKind() == Kind.TYPE)
+            ((TypeDeclaration)node.get()).annotations = newArray;
+        else
+            ((AbstractVariableDeclaration)node.get()).annotations = newArray;
+            
+        node.add(annotation, Kind.ANNOTATION).recursiveSetHandled();
     }
 
     private class ConstructorBuilder
@@ -674,7 +690,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
         public Instrumentation(EclipseNode typeNode)
         {
             this.type = (typeNode.get() instanceof TypeDeclaration) ? (TypeDeclaration)typeNode.get() : null;
-            this.javaSpecMapping = new JavaSpecMapping((CompilationUnitDeclaration)typeNode.top().get());
+            this.javaSpecMapping = new JavaSpecMapping(typeNode);
             this.specTypeBefore = javaSpecMapping.specType(type);
         }
         
