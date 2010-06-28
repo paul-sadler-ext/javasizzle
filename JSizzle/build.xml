@@ -4,6 +4,7 @@
     </description>
 
 	<target name="dist" description="generate the distribution">
+		<mkdir dir="dist"/>
 		<jar destfile="dist/jsizzle.jar">
 			<fileset dir="bin" />
 			<service type="lombok.eclipse.EclipseAnnotationHandler">
