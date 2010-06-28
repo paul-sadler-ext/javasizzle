@@ -53,6 +53,7 @@ import org.jsizzle.JavaSpec.Method;
 import org.jsizzle.JavaSpec.Modifier;
 import org.jsizzle.JavaSpec.Name;
 import org.jsizzle.JavaSpec.PrimitiveName;
+import org.jsizzle.JavaSpec.QualifiedTypeName;
 import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.JavaSpec.TypeName;
 import org.jsizzle.JavaSpec.TypeScope;
@@ -208,16 +209,8 @@ public class JavaSpecMapping
         final String key = qualifiedName == null ? null : toQualifiedName(qualifiedName);
         TypeName typeName = typeNames.get(key);
         if (typeName == null)
-        {
-            typeNames.put(key, typeName = new TypeName()
-            {
-                @Override
-                public String toString()
-                {
-                    return key;
-                }
-            });
-        }
+            typeNames.put(key, typeName = new QualifiedTypeName(key));
+
         return typeName;
     }
 
