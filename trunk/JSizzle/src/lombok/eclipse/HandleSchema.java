@@ -35,13 +35,13 @@ import java.util.Map;
 import java.util.Set;
 
 import lombok.AccessLevel;
-import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
+import lombok.core.AnnotationValues;
 import lombok.eclipse.ast.JavaSpecMapping;
+import lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult;
 import lombok.eclipse.handlers.HandleEqualsAndHashCode;
 import lombok.eclipse.handlers.HandleGetter;
 import lombok.eclipse.handlers.HandleToString;
-import lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
@@ -78,10 +78,10 @@ import org.jsizzle.Delta;
 import org.jsizzle.Include;
 import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
+import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.Schema;
 import org.jsizzle.SchemaField;
 import org.jsizzle.SchemaSpec;
-import org.jsizzle.JavaSpec.Type;
 
 public class HandleSchema implements EclipseAnnotationHandler<Schema>
 {
