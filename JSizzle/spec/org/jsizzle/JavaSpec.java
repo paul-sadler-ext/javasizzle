@@ -22,6 +22,10 @@ class JavaSpec
     
     enum PrimitiveName implements TypeName { VOID, BYTE, SHORT, INT, LONG, CHAR, BOOLEAN, DOUBLE, FLOAT }
     
+    enum JavaLangTypeName implements TypeName { OBJECT, ENUM, NONE }
+    
+    class QualifiedTypeName implements TypeName {}
+    
     enum Visibility { DEFAULT, PRIVATE, PROTECTED, PUBLIC }
     
     enum Modifier { FINAL, STATIC }
@@ -36,8 +40,6 @@ class JavaSpec
     enum MetaType { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
     
     enum TypeScope { TOP, MEMBER }
-    
-    enum JavaLangTypeName implements TypeName { OBJECT, ENUM, NONE }
     
     class Type
     {
