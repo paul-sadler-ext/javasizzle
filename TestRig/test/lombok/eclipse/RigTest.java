@@ -14,7 +14,8 @@ public class RigTest
     @Test
     public void testCompile()
     {
-        final StringWriter errWriter = new StringWriter();
+        System.setProperty("org.jsizzle.instrument", "true");
+    	final StringWriter errWriter = new StringWriter();
         BatchCompiler.compile(System.getProperty("testrig.path") + " -d none -1.6 -Xemacs",
                               new PrintWriter(System.out),
                               new PrintWriter(errWriter),

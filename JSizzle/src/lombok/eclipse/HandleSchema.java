@@ -349,7 +349,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
     private static List<AbstractVariableDeclaration> variablesToInclude(EclipseNode includedTypeNode,
                                                                         ConstructorDeclaration includeCons)
     {
-        // Return the constructor arguments, then any additional fields
+        // Return the constructor arguments, then any additional (initialised) fields
         final List<AbstractVariableDeclaration> variables = new ArrayList<AbstractVariableDeclaration>(
                 includeCons.arguments != null ? asList(includeCons.arguments) : noArgs);
         

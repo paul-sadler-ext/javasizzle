@@ -1,40 +1,50 @@
 package org.jsizzle;
 
-import static com.google.common.base.Functions.compose;
+import static com.google.common.base.Predicates.and;
 import static com.google.common.base.Predicates.compose;
+import static com.google.common.base.Predicates.equalTo;
+import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Predicates.notNull;
 import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Iterables.concat;
-import static com.google.common.collect.Maps.transformValues;
-import static com.google.common.collect.Maps.uniqueIndex;
-import static com.google.common.collect.Sets.difference;
-import static com.google.common.collect.Sets.filter;
+import static com.google.common.collect.Iterables.contains;
+import static com.google.common.collect.Iterables.elementsEqual;
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.isEmpty;
+import static com.google.common.collect.Iterables.size;
+import static com.google.common.collect.Iterables.transform;
+import static com.google.common.collect.Lists.transform;
 import static com.google.common.collect.Sets.union;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static org.jcurry.ValueObjects.contains;
+import static org.jcurry.ValueObjects.containsInOrder;
 import static org.jcurry.ValueObjects.flip;
 import static org.jcurry.ValueObjects.toSet;
 import static org.jcurry.ValueObjects.transform;
+import static org.jcurry.ValueObjects.uniques;
 import static org.jsizzle.Delta.deltas;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Collections;
 import java.util.Set;
 
 import org.jsizzle.JavaSpec.Constructor;
+import org.jsizzle.JavaSpec.Field;
 import org.jsizzle.JavaSpec.JavaLangTypeName;
+import org.jsizzle.JavaSpec.Member;
+import org.jsizzle.JavaSpec.MemberType;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
 import org.jsizzle.JavaSpec.Modifier;
-import org.jsizzle.JavaSpec.PrimitiveName;
 import org.jsizzle.JavaSpec.Name;
+import org.jsizzle.JavaSpec.PrimitiveName;
 import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.JavaSpec.TypeName;
-import org.jsizzle.JavaSpec.TypeScope;
 import org.jsizzle.JavaSpec.Variable;
 import org.jsizzle.JavaSpec.Visibility;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicates;
 
 /**
  * This specification models the static syntax tree of a schema class.
@@ -46,12 +56,14 @@ public class SchemaSpec
 {
     Delta<Type> type;
     Function<TypeName, Type> typeResolution;
+    boolean member;
     
     @SuppressWarnings("unchecked")
     @Invariant boolean expectedChanges()
     {
-        return type.unchangedExcept(Type.getConstructors,
-                                    Type.getFields,
+        return type.unchangedExcept(Type.getAnnotations,
+        							Type.getConstructors,
+        							Type.getFields,
                                     Type.getMemberTypes,
                                     Type.getMethods,
                                     Type.getOtherModifiers,
@@ -67,7 +79,7 @@ public class SchemaSpec
     
     @Invariant boolean noBeforeConstructorsAllowed()
     {
-        return type.before.constructors.isEmpty();
+        return isEmpty(type.before.constructors);
     }
     
     @Invariant boolean annotationsCannotBeSchemas()
@@ -77,7 +89,7 @@ public class SchemaSpec
     
     @Invariant boolean markedAsASchema()
     {
-        return type.after.annotations.contains(JSizzleTypeName.SCHEMA);
+        return type.after.annotations.equals(union(type.before.annotations, singleton(JSizzleTypeName.SCHEMA)));
     }
     
     @Invariant boolean schemasArePublic()
@@ -93,13 +105,14 @@ public class SchemaSpec
     
     @Initialise Set<SchemaSpec> memberSchemas()
     {
-        return transform(deltas(type.before.memberTypes, type.after.memberTypes, Type.getName), flip(schemaSpec).apply(typeResolution));
+        return transform(deltas(toSet(transform(type.before.memberTypes, MemberType.getType)),
+        						toSet(transform(type.after.memberTypes, MemberType.getType)), Type.getName),
+        				 flip(flip(schemaSpec).apply(typeResolution)).apply(true));
     }
 
     @Invariant boolean memberSchemasAreStatic()
     {
-        return type.after.metaType != MetaType.CLASS
-                || type.after.scope != TypeScope.MEMBER
+        return type.after.metaType != MetaType.CLASS || !member
                 || type.after.otherModifiers.contains(Modifier.STATIC);
     }
     
@@ -113,17 +126,19 @@ public class SchemaSpec
     
     @Invariant boolean allMemberTypesRetained()
     {
-        return transform(type.after.memberTypes, Type.getName).containsAll(transform(type.before.memberTypes, Type.getName));
+    	return containsInOrder(transform(type.after.memberTypes, MemberType.getName), transform(type.before.memberTypes, MemberType.getName));
     }
     
     interface SchemaConstructor {}
     
     enum SchemaConstructors implements SchemaConstructor { NO_CONSTRUCTOR }
     
+    enum JSizzleName implements Name { IDENTITY }
+    
     class InitSchemaClassConstructor implements SchemaConstructor
     {
         Prime<Constructor> constructor;
-        Map<Name, TypeName> arguments;
+        Iterable<NameAndType> arguments;
         
         @Invariant boolean isPublic()
         {
@@ -140,24 +155,24 @@ public class SchemaSpec
             return constructor.after.otherModifiers.isEmpty();
         }
         
-        @Invariant boolean hasGivenArguments()
+        @Invariant boolean hasGivenArgumentsOrIdentity()
         {
-            return namesAndTypes(constructor.after.arguments).equals(arguments);
+            return elementsEqual(transform(constructor.after.arguments, variableNameAndType), isEmpty(arguments) ?
+            		singleton(new NameAndType(JSizzleName.IDENTITY, JavaLangTypeName.OBJECT)) : arguments);
         }
     }
     
     @Invariant boolean onlyOneConstructor()
     {
-        return type.after.metaType != MetaType.CLASS
-                || type.after.constructors.size() == 1;
+        return type.after.metaType != MetaType.CLASS || size(type.after.constructors) == 1;
     }
     
     @Initialise SchemaConstructor schemaConstructor()
     {
         if (type.after.metaType == MetaType.CLASS)
         {
-            final Map<Name, TypeName> arguments = namesAndTypes(union(getExpandedFields(), difference(type.before.fields, getIncludedFields())));
-            return new InitSchemaClassConstructor(new Prime<Constructor>(getSchemaClassConstructor(type.after)), arguments);
+            return new InitSchemaClassConstructor(new Prime<Constructor>(getSchemaClassConstructor(type.after)),
+            		transform(getFields(true), fieldNameAndType));
         }
         else
         {
@@ -165,9 +180,10 @@ public class SchemaSpec
         }
     }
     
-    static Map<JavaSpec.Name, TypeName> namesAndTypes(Iterable<Variable> variables)
+    class NameAndType
     {
-        return transformValues(uniqueIndex(variables, Variable.getName), Variable.getTypeName);
+    	Name name;
+    	TypeName typeName;
     }
     
     class InvariantMethod
@@ -201,13 +217,40 @@ public class SchemaSpec
         }
     }
     
+    class InitialiseMethod
+    {
+        Delta<Method> method;
+        
+        @Invariant boolean isNotStatic()
+        {
+            return !method.before.otherModifiers.contains(Modifier.STATIC);
+        }
+        
+        @Invariant boolean isAnnotated()
+        {
+            return method.before.annotations.contains(JSizzleTypeName.INITIALISE);
+        }
+        
+        @Invariant boolean isPrivateFinal()
+        {
+            return method.after.visibility.equals(Visibility.PRIVATE)
+                    && method.after.otherModifiers.equals(union(method.before.otherModifiers, singleton(Modifier.FINAL)));
+        }
+        
+        @Invariant boolean hasNoArguments()
+        {
+            return method.before.arguments.isEmpty();
+        }
+    }
+    
     class UtilityMethod
     {
         Delta<Method> method;
         
         @Invariant boolean notInvariant()
         {
-            return !method.before.annotations.contains(JSizzleTypeName.INVARIANT);
+            return !method.before.annotations.contains(JSizzleTypeName.INVARIANT)
+            	&& !method.before.annotations.contains(JSizzleTypeName.INITIALISE);
         }
         
         @Invariant boolean isPublicFinal()
@@ -222,6 +265,7 @@ public class SchemaSpec
     {
         @Include UtilityMethod utility;
         @Include InvariantMethod invariant;
+        @Include InitialiseMethod initialise;
         
         @Invariant boolean onlyModifiersChanged()
         {
@@ -231,21 +275,23 @@ public class SchemaSpec
     
     @Invariant boolean allMethodSignaturesRetained()
     {
-        return transform(type.after.methods, Method.getSignature).containsAll(transform(type.after.methods, Method.getSignature));
+        return containsInOrder(transform(type.before.methods, Method.getSignature), transform(type.after.methods, Method.getSignature));
     }
 
     @Initialise Set<SchemaMethod> memberSchemaMethods()
     {
-        return transform(deltas(type.before.methods, type.after.methods, Method.getSignature), SchemaMethod.schemaMethod);
+        return transform(deltas(toSet(type.before.methods),
+        						toSet(type.after.methods), Method.getSignature),
+        				  SchemaMethod.schemaMethod);
     }
 
     class SchemaField
     {
-        Delta<Variable> field;
+        Delta<Field> field;
         
         @Invariant boolean onlyModifiersChanged()
         {
-            return field.unchangedExcept(Variable.getOtherModifiers, Variable.getVisibility, Variable.getAnnotations);
+            return field.unchangedExcept(Field.getOtherModifiers, Field.getVisibility, Field.getAnnotations);
         }
         
         @Invariant boolean isPublicFinal()
@@ -262,19 +308,79 @@ public class SchemaSpec
     
     @Invariant boolean includedFieldsMustBeResolved()
     {
-        return all(transform(getIncludedFields(), Variable.getTypeName), compose(notNull(), typeResolution));
-    }
-
-    Set<Variable> getIncludedFields()
-    {
-        return filter(type.before.fields, compose(contains(JSizzleTypeName.INCLUDE), Variable.getAnnotations));
+        return all(transform(getIncludedFields(), Field.getTypeName), compose(notNull(), typeResolution));
     }
     
-    Set<Variable> getExpandedFields()
+    Set<Field> getIncludedFields()
     {
-        final Function<Variable, List<Variable>> schemaConstructorArgsForTypeName =
-            compose(Constructor.getArguments, compose(getSchemaClassConstructor, compose(typeResolution, Variable.getTypeName)));
-        return toSet(concat(transform(getIncludedFields(), schemaConstructorArgsForTypeName)));
+        return toSet(filter(type.before.fields, compose(contains(JSizzleTypeName.INCLUDE), Field.getAnnotations)));
+    }
+
+	/**
+	 * Helper method that gets all direct, included and expanded fields in the
+	 * expected order. If {@code excludeInitialised} is {@code true} then all
+	 * initialised fields (including expanded fields initialised in the included
+	 * schema) are excluded.
+	 */
+    Iterable<Field> getFields(final boolean excludeInitialised)
+    {
+		return filter(uniques(concat(type.before.fields, getInjectedFields(excludeInitialised)), Field.getName),
+				excludeInitialised ? not(compose(equalTo(true), fieldInitialised)) : Predicates.<Field>alwaysTrue());
+    }
+    
+    Iterable<Field> getInjectedFields(final boolean excludeInitialised)
+    {
+    	return concat(transform(type.before.members, injectedFieldsForMember.apply(excludeInitialised)));
+    }
+    
+    Iterable<Field> injectedFieldsForMember(boolean excludeInitialised, Member member)
+    {
+    	if (member instanceof Field && ((Field)member).annotations.contains(JSizzleTypeName.INCLUDE))
+    	{
+			// If excluding initialised fields, get fields from the included constructor, because
+			// this will already have taken into account fields initialised in upstream inclusions.
+			final Type fieldType = typeResolution.apply(((Field)member).typeName);
+			return excludeInitialised ? transform(getSchemaClassConstructor(fieldType).getArguments(), fieldFromVariable) : 
+					  filter(fieldType.fields, compose(and(contains(JSizzleTypeName.SCHEMAFIELD),
+	  			              not(contains(JSizzleTypeName.INCLUDE))), Field.getAnnotations));
+		}
+    	else if (member instanceof Method && ((Method)member).annotations.contains(JSizzleTypeName.INITIALISE))
+    	{
+			return singleton(new Field(Visibility.PUBLIC,
+									   singleton(Modifier.FINAL),
+									   Collections.<TypeName>emptySet(), ((Method)member).name,
+									   ((Method)member).returnType));
+    	}
+    	else
+    	{
+    		return emptySet();
+    	}
+    }
+    
+    boolean fieldInitialised(Field field)
+    {
+    	return contains(transform(filter(type.before.methods, compose(contains(JSizzleTypeName.INITIALISE), Method.getAnnotations)),
+    			methodNameAndType), fieldNameAndType(field));
+    }
+    
+    static NameAndType variableNameAndType(Variable variable)
+    {
+    	return new NameAndType(variable.name, variable.typeName);
+    }
+    
+    static NameAndType fieldNameAndType(Field field)
+    {
+    	return variableNameAndType(field.variable);
+    }
+    
+    static NameAndType methodNameAndType(Method method)
+    {
+    	return new NameAndType(method.name, method.returnType);
+    }
+    
+    static Field fieldFromVariable(Variable variable)
+    {
+    	return new Field(Visibility.PUBLIC, variable.otherModifiers, variable.annotations, variable.name, variable.typeName);
     }
     
     static Constructor getSchemaClassConstructor(Type type)
@@ -282,18 +388,13 @@ public class SchemaSpec
         return type.constructors.iterator().next();
     }
     
-    @Invariant boolean allFieldsAreRetained()
+    @Invariant boolean fieldsContainExpectedFields()
     {
-        return namesAndTypes(type.after.fields).entrySet().containsAll(namesAndTypes(type.before.fields).entrySet());
-    }
-    
-    @Invariant boolean fieldsIncludeIncludedAndExpandedFields()
-    {
-        return namesAndTypes(type.after.fields).entrySet().containsAll(namesAndTypes(union(getIncludedFields(), getExpandedFields())).entrySet());
+        return containsInOrder(transform(getFields(false), fieldNameAndType), transform(type.after.fields, fieldNameAndType));
     }
     
     @Initialise Set<SchemaField> schemaFields()
     {
-        return transform(deltas(type.before.fields, type.after.fields, Variable.getName), SchemaField.schemaField);
+        return transform(deltas(toSet(type.before.fields), toSet(type.after.fields), Field.getName), SchemaField.schemaField);
     }
 }
