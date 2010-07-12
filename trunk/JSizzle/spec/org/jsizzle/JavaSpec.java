@@ -2,10 +2,14 @@ package org.jsizzle;
 
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.all;
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.isEmpty;
+import static com.google.common.collect.Iterables.size;
+import static com.google.common.collect.Iterables.transform;
 import static java.util.Collections.singleton;
 import static org.jcurry.ValueObjects.contains;
 import static org.jcurry.ValueObjects.only;
-import static org.jcurry.ValueObjects.transform;
+import static org.jcurry.ValueObjects.uniques;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -16,7 +20,9 @@ import com.google.common.collect.Lists;
 @Schema
 class JavaSpec
 {
-    class Name {}
+    interface Name {}
+    
+    class Identifier implements Name {}
     
     interface TypeName {}
     
@@ -39,39 +45,50 @@ class JavaSpec
     
     enum MetaType { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
     
-    enum TypeScope { TOP, MEMBER }
+    interface Member {}
     
     class Type
     {
         @Include Modifiers modifiers;
         TypeName name;
         MetaType metaType;
-        TypeScope scope;
-        Set<Variable> fields;
-        Set<Constructor> constructors;
-        Set<Method> methods;
-        Set<Type> memberTypes;
         TypeName superType;
         Set<TypeName> interfaces;
+        List<Member> members;
+        
+        @Initialise Iterable<Field> fields()
+        {
+        	return filter(members, Field.class);
+        }
+        
+        @Initialise Iterable<Method> methods()
+        {
+        	return filter(members, Method.class);
+        }
+        
+        @Initialise Iterable<MemberType> memberTypes()
+        {
+        	return filter(members, MemberType.class);
+        }
+        
+        @Initialise Iterable<Constructor> constructors()
+        {
+        	return filter(members, Constructor.class);
+        }
         
         @Invariant boolean fieldNamesUnique()
         {
-            return transform(fields, Variable.getName).size() == fields.size();
+            return size(uniques(fields, Field.getName)) == size(fields);
         }
         
         @Invariant boolean methodSignaturesUnique()
         {
-            return transform(methods, Method.getSignature).size() == methods.size();
+            return size(uniques(methods, Method.getSignature)) == size(methods);
         }
         
         @Invariant boolean memberTypeNamesUnique()
         {
-            return transform(memberTypes, Type.getName).size() == memberTypes.size();
-        }
-        
-        @Invariant boolean memberTypesAreMemberScope()
-        {
-            return all(transform(memberTypes, getScope), equalTo(TypeScope.MEMBER));
+            return size(uniques(memberTypes, MemberType.getName)) == size(memberTypes);
         }
         
         @Invariant boolean modifiersAllowed()
@@ -91,7 +108,7 @@ class JavaSpec
             {
             case INTERFACE:
             case ANNOTATION:
-                return all(transform(fields, Variable.getOtherModifiers), contains(Modifier.STATIC));
+                return all(transform(fields, Field.getOtherModifiers), contains(Modifier.STATIC));
             default:
                 return true;
             }
@@ -103,7 +120,7 @@ class JavaSpec
             {
             case INTERFACE:
             case ANNOTATION:
-                return constructors.isEmpty();
+                return isEmpty(constructors);
             default:
                 return true;
             }
@@ -122,10 +139,20 @@ class JavaSpec
         }
     }
     
+    class MemberType implements Member
+    {
+    	@Include Type type;
+    }
+    
     class Procedure
     {
         @Include Modifiers modifiers;
         List<Variable> arguments;
+        
+        @Invariant boolean argumentNamesUnique()
+        {
+            return size(uniques(arguments, Variable.getName)) == arguments.size();
+        }
 
         @Invariant boolean argumentsHaveAllowedModifiers()
         {
@@ -139,7 +166,7 @@ class JavaSpec
         }
     }
     
-    class Constructor
+    class Constructor implements Member
     {
         @Include Procedure procedure;
         
@@ -156,7 +183,7 @@ class JavaSpec
         TypeName returnType;
     }
 
-    class Method
+    class Method implements Member
     {
         @Include Procedure procedure;
         @Include Signature signature;
@@ -166,11 +193,16 @@ class JavaSpec
             return argumentTypes.equals(Lists.transform(arguments, Variable.getTypeName));
         }
     }
-
+    
     class Variable
     {
         @Include Modifiers modifiers;
         Name name;
         TypeName typeName;
+    }
+    
+    class Field implements Member
+    {
+    	@Include Variable variable;
     }
 }

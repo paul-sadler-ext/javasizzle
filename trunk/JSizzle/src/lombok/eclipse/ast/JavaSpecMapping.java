@@ -1,15 +1,16 @@
 package lombok.eclipse.ast;
 
 import static com.google.common.base.Functions.compose;
+import static com.google.common.base.Predicates.notNull;
+import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
-import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.sort;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Eclipse.toQualifiedName;
 import static lombok.eclipse.ast.AstUtilities.findLocalType;
@@ -23,6 +24,8 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccP
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccPublic;
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccStatic;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -32,10 +35,12 @@ import lombok.core.TypeLibrary;
 import lombok.core.TypeResolver;
 import lombok.eclipse.EclipseNode;
 
+import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.ConstructorDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
@@ -44,10 +49,12 @@ import org.jsizzle.Binding;
 import org.jsizzle.Include;
 import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
-import org.jsizzle.Schema;
-import org.jsizzle.SchemaField;
 import org.jsizzle.JavaSpec.Constructor;
+import org.jsizzle.JavaSpec.Field;
+import org.jsizzle.JavaSpec.Identifier;
 import org.jsizzle.JavaSpec.JavaLangTypeName;
+import org.jsizzle.JavaSpec.Member;
+import org.jsizzle.JavaSpec.MemberType;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
 import org.jsizzle.JavaSpec.Modifier;
@@ -56,13 +63,14 @@ import org.jsizzle.JavaSpec.PrimitiveName;
 import org.jsizzle.JavaSpec.QualifiedTypeName;
 import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.JavaSpec.TypeName;
-import org.jsizzle.JavaSpec.TypeScope;
 import org.jsizzle.JavaSpec.Variable;
 import org.jsizzle.JavaSpec.Visibility;
+import org.jsizzle.Schema;
+import org.jsizzle.SchemaField;
+import org.jsizzle.SchemaSpec.JSizzleName;
 import org.jsizzle.SchemaSpec.JSizzleTypeName;
 
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -126,28 +134,63 @@ public class JavaSpecMapping
     @AsFunction
     public Type specType(TypeDeclaration type)
     {
-        return new Type(specVisibility(type.modifiers),
+    	return new Type(specVisibility(type.modifiers),
                         specOtherModifiers(type.modifiers),
                         specSet(type.annotations, specAnnotation.apply(type)),
                         specClassName(fullyQualifiedName(type, compilationUnit)),
                         specMetaType(type.modifiers),
-                        type.enclosingType != null ? TypeScope.MEMBER : TypeScope.TOP,
-                        specSet(type.fields, specVariable.apply(type)),
-                        specConstructors(type),
-                        specSet(type.methods, specMethod.apply(type), MethodDeclaration.class),
-                        specSet(type.memberTypes, specType),
                         specReference(type.enclosingType, type.superclass),
-                        specSet(type.superInterfaces, specReference.apply(type.enclosingType)));
+                        specSet(type.superInterfaces, specReference.apply(type.enclosingType)),
+                        specMembers(type));
+    }
+
+	public List<Member> specMembers(TypeDeclaration type)
+	{
+		final List<ASTNode> members = newArrayList(concat(safeList(type.fields), safeList(type.methods), safeList(type.memberTypes)));
+        sort(members, new Comparator<ASTNode>()
+		{
+			@Override
+			public int compare(ASTNode n1, ASTNode n2)
+			{
+				return Integer.valueOf(n1.sourceStart).compareTo(n2.sourceStart);
+			}
+		});
+		return newArrayList(filter(transform(members, specMember.apply(type)), notNull()));
+	}
+    
+    @AsFunction
+    public Member specMember(TypeDeclaration scope, ASTNode member)
+    {
+    	if (member instanceof MethodDeclaration)
+    	{
+    		return specMethod(scope, (MethodDeclaration)member);
+    	}
+    	else if (member instanceof ConstructorDeclaration)
+    	{
+    		if (!((ConstructorDeclaration)member).isDefaultConstructor())
+    			return specConstructor(scope, (ConstructorDeclaration)member);
+    	}
+    	else if (member instanceof FieldDeclaration)
+    	{
+    		return specField(scope, (FieldDeclaration)member);
+    	}
+    	else if (member instanceof TypeDeclaration)
+    	{
+    		final Type type = specType((TypeDeclaration)member);
+			return new MemberType(type.visibility, type.otherModifiers, type.annotations, type.name, type.metaType, type.superType, type.interfaces, type.members);
+    	}
+    	return null;
     }
     
     @AsFunction
     public Method specMethod(TypeDeclaration scope, MethodDeclaration method)
     {
-        return new Method(specVisibility(method.modifiers),
+        char[] name = method.selector;
+		return new Method(specVisibility(method.modifiers),
                           specOtherModifiers(method.modifiers),
                           specSet(method.annotations, specAnnotation.apply(scope)),
                           specList(method.arguments, specVariable.apply(scope)),
-                          new Name(new String(method.selector)),
+                          specName(name),
                           specList(method.arguments, compose(Variable.getTypeName, specVariable.apply(scope))),
                           specReference(scope, method.returnType));
     }
@@ -167,8 +210,18 @@ public class JavaSpecMapping
         return new Variable(specVisibility(variable.modifiers),
                             specOtherModifiers(variable.modifiers),
                             specSet(variable.annotations, specAnnotation.apply(scope)),
-                            new Name(new String(variable.name)),
+                            specName(variable.name),
                             specReference(scope, variable.type));
+    }
+    
+    @AsFunction
+    public Field specField(TypeDeclaration scope, FieldDeclaration field)
+    {
+        return new Field(specVisibility(field.modifiers),
+        				 specOtherModifiers(field.modifiers),
+        				 specSet(field.annotations, specAnnotation.apply(scope)),
+        				 specName(field.name),
+        				 specReference(scope, field.type));
     }
     
     @AsFunction
@@ -214,61 +267,31 @@ public class JavaSpecMapping
         return typeName;
     }
 
-    private static <A, S> Set<S> specSet(A[] astns, Function<A, S> specA)
-    {
-        if (astns == null)
-        {
-            return emptySet();
-        }
-        else
-        {
-            return newHashSet(transform(asList(astns), specA));
-        }
-    }
+	private static Name specName(char[] name)
+	{
+		return Arrays.equals(name, "identity".toCharArray()) ? JSizzleName.IDENTITY : new Identifier(new String(name));
+	}
     
-    private static <A, D extends A, S> Set<S> specSet(A[] astns, Function<D, S> specA, final Class<D> typeD)
+    private static <A> List<A> safeList(A[] astns)
     {
-        if (astns == null)
-        {
-            return emptySet();
-        }
-        else
-        {
-            return newHashSet(transform(filter(asList(astns), typeD), specA));
-        }
+    	if (astns == null)
+    	{
+    		return emptyList();
+    	}
+    	else
+    	{
+    		return asList(astns);
+    	}
     }
     
     private static <A, S> List<S> specList(A[] astns, Function<A, S> specA)
     {
-        if (astns == null)
-        {
-            return emptyList();
-        }
-        else
-        {
-            return newArrayList(transform(asList(astns), specA));
-        }
+        return newArrayList(transform(safeList(astns), specA));
     }
 
-    private Set<Constructor> specConstructors(TypeDeclaration type)
+    private static <A, S> Set<S> specSet(A[] astns, Function<A, S> specA)
     {
-        if (type.methods == null)
-        {
-            return emptySet();
-        }
-        else
-        {
-            final Iterable<ConstructorDeclaration> constructors =
-                filter(filter(asList(type.methods), ConstructorDeclaration.class), new Predicate<ConstructorDeclaration>()
-            {
-                @Override
-                public boolean apply(ConstructorDeclaration input)
-                {
-                    return !input.isDefaultConstructor();
-                }
-            });
-            return newHashSet(transform(constructors, specConstructor.apply(type)));
-        }
+        return newHashSet(transform(safeList(astns), specA));
     }
 
     private static Set<Modifier> specOtherModifiers(final int modifiers)
