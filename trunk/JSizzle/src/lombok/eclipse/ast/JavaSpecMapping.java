@@ -1,16 +1,15 @@
 package lombok.eclipse.ast;
 
 import static com.google.common.base.Functions.compose;
-import static com.google.common.base.Predicates.notNull;
-import static com.google.common.collect.Iterables.concat;
+import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.sort;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
 import static lombok.eclipse.Eclipse.toQualifiedName;
 import static lombok.eclipse.ast.AstUtilities.findLocalType;
@@ -25,7 +24,6 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccP
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccStatic;
 
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +33,10 @@ import lombok.core.TypeLibrary;
 import lombok.core.TypeResolver;
 import lombok.eclipse.EclipseNode;
 
-import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.ConstructorDeclaration;
-import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
@@ -50,11 +46,8 @@ import org.jsizzle.Include;
 import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
 import org.jsizzle.JavaSpec.Constructor;
-import org.jsizzle.JavaSpec.Field;
 import org.jsizzle.JavaSpec.Identifier;
 import org.jsizzle.JavaSpec.JavaLangTypeName;
-import org.jsizzle.JavaSpec.Member;
-import org.jsizzle.JavaSpec.MemberType;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
 import org.jsizzle.JavaSpec.Modifier;
@@ -63,6 +56,7 @@ import org.jsizzle.JavaSpec.PrimitiveName;
 import org.jsizzle.JavaSpec.QualifiedTypeName;
 import org.jsizzle.JavaSpec.Type;
 import org.jsizzle.JavaSpec.TypeName;
+import org.jsizzle.JavaSpec.TypeScope;
 import org.jsizzle.JavaSpec.Variable;
 import org.jsizzle.JavaSpec.Visibility;
 import org.jsizzle.Schema;
@@ -71,6 +65,7 @@ import org.jsizzle.SchemaSpec.JSizzleName;
 import org.jsizzle.SchemaSpec.JSizzleTypeName;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -113,7 +108,15 @@ public class JavaSpecMapping
     private final BiMap<String, TypeName> typeNames = HashBiMap.create(fixedTypeNames);
     private final CompilationUnitDeclaration compilationUnit;
     private final TypeResolver resolver;
-    
+	private static final Predicate<ConstructorDeclaration> nonDefaultConstructors = new Predicate<ConstructorDeclaration>()
+	{
+		@Override
+		public boolean apply(ConstructorDeclaration constructor)
+		{
+			return !constructor.isDefaultConstructor();
+		}
+	};
+
     public JavaSpecMapping(EclipseNode start)
     {
         this.compilationUnit = (CompilationUnitDeclaration)start.top().get();
@@ -134,52 +137,18 @@ public class JavaSpecMapping
     @AsFunction
     public Type specType(TypeDeclaration type)
     {
-    	return new Type(specVisibility(type.modifiers),
+		return new Type(specVisibility(type.modifiers),
                         specOtherModifiers(type.modifiers),
                         specSet(type.annotations, specAnnotation.apply(type)),
                         specClassName(fullyQualifiedName(type, compilationUnit)),
                         specMetaType(type.modifiers),
+                        specTypeScope(type),
                         specReference(type.enclosingType, type.superclass),
                         specSet(type.superInterfaces, specReference.apply(type.enclosingType)),
-                        specMembers(type));
-    }
-
-	public List<Member> specMembers(TypeDeclaration type)
-	{
-		final List<ASTNode> members = newArrayList(concat(safeList(type.fields), safeList(type.methods), safeList(type.memberTypes)));
-        sort(members, new Comparator<ASTNode>()
-		{
-			@Override
-			public int compare(ASTNode n1, ASTNode n2)
-			{
-				return Integer.valueOf(n1.sourceStart).compareTo(n2.sourceStart);
-			}
-		});
-		return newArrayList(filter(transform(members, specMember.apply(type)), notNull()));
-	}
-    
-    @AsFunction
-    public Member specMember(TypeDeclaration scope, ASTNode member)
-    {
-    	if (member instanceof MethodDeclaration)
-    	{
-    		return specMethod(scope, (MethodDeclaration)member);
-    	}
-    	else if (member instanceof ConstructorDeclaration)
-    	{
-    		if (!((ConstructorDeclaration)member).isDefaultConstructor())
-    			return specConstructor(scope, (ConstructorDeclaration)member);
-    	}
-    	else if (member instanceof FieldDeclaration)
-    	{
-    		return specField(scope, (FieldDeclaration)member);
-    	}
-    	else if (member instanceof TypeDeclaration)
-    	{
-    		final Type type = specType((TypeDeclaration)member);
-			return new MemberType(type.visibility, type.otherModifiers, type.annotations, type.name, type.metaType, type.superType, type.interfaces, type.members);
-    	}
-    	return null;
+                        specList(type.fields, specVariable.apply(type)),
+                        specList(type.memberTypes, specType),
+                        specList(type.methods, specConstructor.apply(type), ConstructorDeclaration.class, nonDefaultConstructors),
+                        specList(type.methods, specMethod.apply(type), MethodDeclaration.class));
     }
     
     @AsFunction
@@ -212,16 +181,6 @@ public class JavaSpecMapping
                             specSet(variable.annotations, specAnnotation.apply(scope)),
                             specName(variable.name),
                             specReference(scope, variable.type));
-    }
-    
-    @AsFunction
-    public Field specField(TypeDeclaration scope, FieldDeclaration field)
-    {
-        return new Field(specVisibility(field.modifiers),
-        				 specOtherModifiers(field.modifiers),
-        				 specSet(field.annotations, specAnnotation.apply(scope)),
-        				 specName(field.name),
-        				 specReference(scope, field.type));
     }
     
     @AsFunction
@@ -286,12 +245,27 @@ public class JavaSpecMapping
     
     private static <A, S> List<S> specList(A[] astns, Function<A, S> specA)
     {
-        return newArrayList(transform(safeList(astns), specA));
+    	return newArrayList(transform(safeList(astns), specA));
+    }
+    
+    private static <A, B extends A, S> List<S> specList(A[] astns, Function<B, S> specB, Class<B> classB)
+    {
+        return specList(astns, specB, classB, alwaysTrue());
+    }
+    
+    private static <A, B extends A, S> List<S> specList(A[] astns, Function<B, S> specB, Class<B> classB, Predicate<? super B> filter)
+    {
+        return newArrayList(transform(filter(filter(safeList(astns), classB), filter), specB));
     }
 
     private static <A, S> Set<S> specSet(A[] astns, Function<A, S> specA)
     {
         return newHashSet(transform(safeList(astns), specA));
+    }
+    
+    private static TypeScope specTypeScope(TypeDeclaration type)
+    {
+    	return type.enclosingType == null ? TypeScope.TOP : TypeScope.MEMBER;
     }
 
     private static Set<Modifier> specOtherModifiers(final int modifiers)

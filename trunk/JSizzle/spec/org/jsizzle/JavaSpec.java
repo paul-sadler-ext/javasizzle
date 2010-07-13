@@ -2,7 +2,6 @@ package org.jsizzle;
 
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.all;
-import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.isEmpty;
 import static com.google.common.collect.Iterables.size;
 import static com.google.common.collect.Iterables.transform;
@@ -45,40 +44,24 @@ class JavaSpec
     
     enum MetaType { CLASS, ENUMERATION, INTERFACE, ANNOTATION }
     
-    interface Member {}
+    enum TypeScope { TOP, MEMBER }
     
     class Type
     {
         @Include Modifiers modifiers;
         TypeName name;
         MetaType metaType;
+        TypeScope scope;
         TypeName superType;
         Set<TypeName> interfaces;
-        List<Member> members;
-        
-        @Initialise Iterable<Field> fields()
-        {
-        	return filter(members, Field.class);
-        }
-        
-        @Initialise Iterable<Method> methods()
-        {
-        	return filter(members, Method.class);
-        }
-        
-        @Initialise Iterable<MemberType> memberTypes()
-        {
-        	return filter(members, MemberType.class);
-        }
-        
-        @Initialise Iterable<Constructor> constructors()
-        {
-        	return filter(members, Constructor.class);
-        }
+        List<Variable> fields;
+        List<Type> memberTypes;
+        List<Constructor> constructors;
+        List<Method> methods;
         
         @Invariant boolean fieldNamesUnique()
         {
-            return size(uniques(fields, Field.getName)) == size(fields);
+            return size(uniques(fields, Variable.getName)) == size(fields);
         }
         
         @Invariant boolean methodSignaturesUnique()
@@ -88,7 +71,7 @@ class JavaSpec
         
         @Invariant boolean memberTypeNamesUnique()
         {
-            return size(uniques(memberTypes, MemberType.getName)) == size(memberTypes);
+            return size(uniques(memberTypes, Type.getName)) == size(memberTypes);
         }
         
         @Invariant boolean modifiersAllowed()
@@ -108,7 +91,7 @@ class JavaSpec
             {
             case INTERFACE:
             case ANNOTATION:
-                return all(transform(fields, Field.getOtherModifiers), contains(Modifier.STATIC));
+                return all(transform(fields, Variable.getOtherModifiers), contains(Modifier.STATIC));
             default:
                 return true;
             }
@@ -139,11 +122,6 @@ class JavaSpec
         }
     }
     
-    class MemberType implements Member
-    {
-    	@Include Type type;
-    }
-    
     class Procedure
     {
         @Include Modifiers modifiers;
@@ -166,7 +144,7 @@ class JavaSpec
         }
     }
     
-    class Constructor implements Member
+    class Constructor
     {
         @Include Procedure procedure;
         
@@ -183,7 +161,7 @@ class JavaSpec
         TypeName returnType;
     }
 
-    class Method implements Member
+    class Method
     {
         @Include Procedure procedure;
         @Include Signature signature;
@@ -199,10 +177,5 @@ class JavaSpec
         @Include Modifiers modifiers;
         Name name;
         TypeName typeName;
-    }
-    
-    class Field implements Member
-    {
-    	@Include Variable variable;
     }
 }
