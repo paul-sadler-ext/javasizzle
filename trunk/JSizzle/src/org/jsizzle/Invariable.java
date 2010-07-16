@@ -1,11 +1,9 @@
 package org.jsizzle;
 
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.jcurry.AsFunction;
-
-import com.google.common.base.Predicate;
 
 public interface Invariable
 {
@@ -19,19 +17,8 @@ public interface Invariable
     Iterable<? extends Entry<? extends Invariable, Set<String>>> getViolations();
 
     /**
-     * Returns whether this invariable violates its invariant. Note this method
-     * is not made available as a function because a predicate is more useful.
-     * 
-     * @see #invariant
+     * Returns whether this invariable violates its invariant.
      */
+    @AsFunction
     boolean invariant();
-    
-    static final Predicate<Invariable> invariant = new Predicate<Invariable>()
-    {
-        @Override
-        public boolean apply(Invariable invariable)
-        {
-            return invariable.invariant();
-        }
-    };
 }
