@@ -6,12 +6,15 @@ import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Predicates.notNull;
+import static com.google.common.base.Predicates.or;
 import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.contains;
 import static com.google.common.collect.Iterables.elementsEqual;
 import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.indexOf;
 import static com.google.common.collect.Iterables.isEmpty;
+import static com.google.common.collect.Iterables.limit;
 import static com.google.common.collect.Iterables.size;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.transform;
@@ -21,6 +24,7 @@ import static java.util.Collections.singleton;
 import static org.jcurry.ValueObjects.contains;
 import static org.jcurry.ValueObjects.containsInOrder;
 import static org.jcurry.ValueObjects.flip;
+import static org.jcurry.ValueObjects.list;
 import static org.jcurry.ValueObjects.toSet;
 import static org.jcurry.ValueObjects.transform;
 import static org.jcurry.ValueObjects.uniques;
@@ -133,20 +137,16 @@ import com.google.common.base.Function;
     {
     }
 
-    enum SchemaConstructors implements SchemaConstructor
-    {
-        NO_CONSTRUCTOR
-    }
+    enum SchemaConstructors implements SchemaConstructor { NO_CONSTRUCTOR }
 
-    enum JSizzleName implements Name
-    {
-        IDENTITY
-    }
+    enum JSizzleName implements Name { IDENTITY }
 
     class InitSchemaClassConstructor implements SchemaConstructor
     {
         Prime<Constructor> constructor;
         Iterable<NameAndType> arguments;
+        static final NameAndType identity = new NameAndType(JSizzleName.IDENTITY,
+                                                            JavaLangTypeName.OBJECT);
 
         @Invariant boolean isPublic()
         {
@@ -167,9 +167,7 @@ import com.google.common.base.Function;
         {
             final boolean b = elementsEqual(transform(constructor.after.arguments,
                                                       variableNameAndType),
-                                            isEmpty(arguments) ? singleton(new NameAndType(JSizzleName.IDENTITY,
-                                                                                           JavaLangTypeName.OBJECT))
-                                                    : arguments);
+                                            isEmpty(arguments) ? singleton(identity) : arguments);
             return b;
         }
     }
@@ -260,7 +258,7 @@ import com.google.common.base.Function;
     {
         Delta<Method> method;
 
-        @Invariant boolean notInvariant()
+        @Invariant boolean notInvariantOrInitialise()
         {
             return !method.before.annotations.contains(JSizzleTypeName.INVARIANT)
                     && !method.before.annotations.contains(JSizzleTypeName.INITIALISE);
@@ -326,8 +324,8 @@ import com.google.common.base.Function;
 
         @Invariant boolean hasSchemaFieldAnnotation()
         {
-            return field.after.annotations.equals(union(field.before.annotations,
-                                                        singleton(JSizzleTypeName.SCHEMAFIELD)));
+            return field.before.otherModifiers.contains(Modifier.STATIC)
+                    || field.after.annotations.equals(union(field.before.annotations, singleton(JSizzleTypeName.SCHEMAFIELD)));
         }
     }
 
@@ -348,28 +346,36 @@ import com.google.common.base.Function;
      */
     Iterable<NameAndType> getConstructorArgs()
     {
-        return filter(uniques(concat(transform(type.before.fields, constructorFieldsForField)), NameAndType.getName),
-                      not(compose(equalTo(true), fieldInitialised)));
+        return filter(uniques(concat(transform(type.before.fields, constructorArgsForField)),
+                              NameAndType.getName),
+                      not(fieldInitialisedLocally));
     }
 
     /**
      * Helper method that gets all direct, included and expanded fields in the
      * expected order.
      */
-    Iterable<NameAndType> getExpectedFields()
+    Set<NameAndType> getExpectedFields()
     {
-        return uniques(concat(transform(type.before.fields, variableNameAndType),
-                              concat(transform(type.before.fields, injectedFieldsForField)),
-                              concat(transform(type.before.methods, injectedFieldsForMethod))),
-                       NameAndType.getName);
+        return toSet(uniques(concat(transform(type.before.fields, variableNameAndType),
+                                    concat(transform(type.before.fields, injectedFieldsForField)),
+                                    concat(transform(type.before.methods, injectedFieldsForMethod))),
+                             NameAndType.getName));
     }
-    
-    Iterable<NameAndType> constructorFieldsForField(Variable field)
+
+    Iterable<NameAndType> constructorArgsForField(Variable field)
     {
-        if (field.annotations.contains(JSizzleTypeName.INCLUDE))
+        if (field.otherModifiers.contains(Modifier.STATIC))
         {
-            return filter(transform(getSchemaClassConstructor(typeResolution.apply(field.typeName)).getArguments(), variableNameAndType),
-                          compose(not(in(transform(type.before.fields, Variable.getName))), NameAndType.getName));
+            return emptySet();
+        }
+        else if (field.annotations.contains(JSizzleTypeName.INCLUDE))
+        {
+            return filter(transform(getSchemaClassConstructor(typeResolution.apply(field.typeName)).getArguments(),
+                                    variableNameAndType),
+                          and(compose(not(in(transform(type.before.fields, Variable.getName))), NameAndType.getName),
+                              not(or(transform(limit(type.before.fields, indexOf(type.before.fields, equalTo(field))),
+                                               fieldInitialisedByInclusion)))));
         }
         else
         {
@@ -405,13 +411,18 @@ import com.google.common.base.Function;
         }
     }
 
-    boolean fieldInitialised(NameAndType field)
+    boolean fieldInitialisedLocally(NameAndType field)
     {
         return contains(transform(filter(type.before.methods,
                                          compose(contains(JSizzleTypeName.INITIALISE),
                                                  Method.getAnnotations)),
                                   methodNameAndType),
                         field);
+    }
+    
+    boolean fieldInitialisedByInclusion(Variable included, NameAndType field)
+    {
+        return contains(filter(injectedFieldsForField(included), not(in(list(constructorArgsForField(included))))), field);
     }
 
     static NameAndType variableNameAndType(Variable variable)
@@ -432,8 +443,7 @@ import com.google.common.base.Function;
     @Invariant boolean fieldsContainExpectedFields()
     {
         return type.before.metaType != MetaType.CLASS
-                || containsInOrder(transform(type.after.fields, variableNameAndType),
-                                   getExpectedFields());
+                || transform(type.after.fields, variableNameAndType).containsAll(getExpectedFields());
     }
 
     @Initialise Set<SchemaField> schemaFields()
