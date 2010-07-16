@@ -1,6 +1,7 @@
 package org.jsizzle;
 
 import static com.google.common.base.Functions.compose;
+import static com.google.common.base.Functions.forPredicate;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Predicates.notNull;
@@ -20,10 +21,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 
 public abstract class Binding<T extends Binding<T>> implements Invariable
 {
@@ -66,6 +68,11 @@ public abstract class Binding<T extends Binding<T>> implements Invariable
     protected void addAccessor(Function<T, ?> accessor, Inclusion inclusion)
     {
         accessors.put(accessor, inclusion);
+    }
+
+    protected void addAccessor(Predicate<T> accessor, Inclusion inclusion)
+    {
+        accessors.put(forPredicate(accessor), inclusion);
     }
     
     protected void addViolation(String violation)
