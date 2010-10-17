@@ -312,7 +312,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             
             // Create toString, equals and hashCode
             new HandleToString().generateToStringForType(typeNode, errorNode);
-            new HandleEqualsAndHashCode().generateMethods(typeNode, errorNode, null, null, false, true);
+            new HandleEqualsAndHashCode().generateMethods(typeNode, errorNode, null, null, false, true, true);
         }
         
         for (EclipseNode subTypeNode : typeNode.down())
@@ -339,7 +339,7 @@ public class HandleSchema implements EclipseAnnotationHandler<Schema>
             // in org.eclipse.jdt.core.dom.ASTConverter.convertType
             this.accessorName = generateFunction(fieldNode, AccessLevel.PUBLIC, errorNode, source);
             // Generate a Getter for the field (useful for auto-implementing interfaces)
-            new HandleGetter().generateGetterForField(fieldNode, source.node);
+            new HandleGetter().generateGetterForField(fieldNode, source.node, AccessLevel.PUBLIC);
             // Mark the field as a schema field
             final QualifiedTypeReference schemaFieldType = source.generated(new QualifiedTypeReference(ORG_JSIZZLE_SCHEMAFIELD, source.p(3)));
             injectAnnotation(fieldNode, source.generated(new MarkerAnnotation(schemaFieldType, source.pS)));
