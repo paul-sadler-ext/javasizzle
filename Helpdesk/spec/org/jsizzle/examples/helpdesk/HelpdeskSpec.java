@@ -27,8 +27,7 @@ import org.jsizzle.Prime;
 import org.jsizzle.Schema;
 import org.jsizzle.Xi;
 
-@Schema
-class HelpdeskSpec
+@Schema class HelpdeskSpec
 {
     class Customer {}
     class Analyst {}
@@ -152,7 +151,9 @@ class HelpdeskSpec
             
             @Invariant boolean referenceAdded()
             {
-                return issue.after.references.equals(union(issue.before.references, singleton(reference)));
+                return issue.after.references.equals(
+                    union(issue.before.references,
+                          singleton(reference)));
             }
         }
         

@@ -23,7 +23,7 @@ public class HelpdeskJavaSpec
     {
         public final Analyst analyst;
 
-        private Note(Analyst analyst)
+        protected Note(Analyst analyst)
         {
             this.analyst = analyst;
         }
@@ -33,7 +33,7 @@ public class HelpdeskJavaSpec
     {
         public final String text;
 
-        private TextNote(Analyst analyst, String text)
+        public TextNote(Analyst analyst, String text)
         {
             super(analyst);
             this.text = text;
@@ -44,7 +44,7 @@ public class HelpdeskJavaSpec
     {
         public final byte[] data;
 
-        private AttachmentNote(Analyst analyst, byte[] data)
+        public AttachmentNote(Analyst analyst, byte[] data)
         {
             super(analyst);
             this.data = data;
@@ -55,7 +55,7 @@ public class HelpdeskJavaSpec
     {
         public final Resolution resolution;
 
-        private ResolutionNote(Analyst analyst, Resolution resolution)
+        public ResolutionNote(Analyst analyst, Resolution resolution)
         {
             super(analyst);
             this.resolution = resolution;
