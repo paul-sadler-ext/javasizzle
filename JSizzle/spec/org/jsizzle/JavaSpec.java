@@ -16,9 +16,22 @@ import java.util.Set;
 
 import com.google.common.collect.Lists;
 
-@Schema
-class JavaSpec
+/**
+ * This specification represents a subset of the Java language
+ * specification, as required to set up the constructs that will be
+ * used in specifying <font face="Cooper Black">JSizzle</font>
+ * behaviour in {@link SchemaSpec}.
+ * <p>
+ * Some of the invariants used in this specification are redundant
+ * because JSizzle code is legal Java both before and after
+ * processing, so they are actually checked by the compiler. These
+ * invariants exist here only for illustration.
+ */
+@Schema class JavaSpec
 {
+    /**
+     * A <code>Name</code> is a Java variable identifier.
+     */
     interface Name {}
     
     class Identifier implements Name {}
