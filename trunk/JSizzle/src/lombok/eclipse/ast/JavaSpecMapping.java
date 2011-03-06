@@ -23,7 +23,6 @@ import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccP
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccPublic;
 import static org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants.AccStatic;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +45,6 @@ import org.jsizzle.Include;
 import org.jsizzle.Initialise;
 import org.jsizzle.Invariant;
 import org.jsizzle.JavaSpec.Constructor;
-import org.jsizzle.JavaSpec.Identifier;
 import org.jsizzle.JavaSpec.JavaLangTypeName;
 import org.jsizzle.JavaSpec.MetaType;
 import org.jsizzle.JavaSpec.Method;
@@ -61,7 +59,6 @@ import org.jsizzle.JavaSpec.Variable;
 import org.jsizzle.JavaSpec.Visibility;
 import org.jsizzle.Schema;
 import org.jsizzle.SchemaField;
-import org.jsizzle.SchemaSpec.JSizzleName;
 import org.jsizzle.SchemaSpec.JSizzleTypeName;
 
 import com.google.common.base.Function;
@@ -226,9 +223,9 @@ public class JavaSpecMapping
         return typeName;
     }
 
-	private static Name specName(char[] name)
+	private static Name specName(char[] identifier)
 	{
-		return Arrays.equals(name, "identity".toCharArray()) ? JSizzleName.IDENTITY : new Identifier(new String(name));
+		return new Name(new String(identifier));
 	}
     
     private static <A> List<A> safeList(A[] astns)
