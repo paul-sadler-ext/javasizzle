@@ -621,10 +621,17 @@ import com.google.common.base.Function;
 
     /**
      * <code>getConstructorArgs()</code> is a helper method that gets
-     * all direct, included and expanded fields in the expected order
-     * for the constructor. All included and initialised fields
-     * (including expanded fields initialised in the included schema)
-     * are excluded.
+     * all direct and expanded fields in the expected order for the
+     * constructor. All included and initialised fields (including
+     * expanded fields initialised in the included schema) are
+     * excluded.
+     * <p>
+     * The expected order is defined as the list concatenation of all
+     * expected constructor arguments for each field of the input
+     * class, as returned by the
+     * <code>constructorArgsForField()</code> helper, de-duplicated in
+     * the order in which they first appear, and excluding any fields
+     * that are initialised locally in this schema.
      */
     Iterable<NameAndType> getConstructorArgs()
     {
@@ -635,8 +642,8 @@ import com.google.common.base.Function;
     }
 
     /**
-     * Helper method that gets all direct, included and expanded fields in the
-     * expected order.
+     * Helper method that gets all direct, included and expanded
+     * fields in the expected order.
      */
     Set<NameAndType> getExpectedFields()
     {
