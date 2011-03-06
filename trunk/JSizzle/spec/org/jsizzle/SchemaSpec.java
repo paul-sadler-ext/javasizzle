@@ -52,7 +52,7 @@ import com.google.common.base.Function;
  * includes the pre-schema AST, so that added members and fields can taken into
  * account.
  */
-@Schema public class SchemaSpec
+@Schema class SchemaSpec
 {
     Delta<Type> type;
     Function<TypeName, Type> typeResolution;
