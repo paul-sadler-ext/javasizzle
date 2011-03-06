@@ -273,6 +273,12 @@ class IssueImpl implements Issue
         }
     }
     
+    @AsFunction
+    HelpdeskSpec.Id specId()
+    {
+        return new HelpdeskSpec.Id(this);
+    }
+    
     @SuppressWarnings("unchecked")
     @AsFunction
     HelpdeskSpec.Issue specIssue()
@@ -282,12 +288,6 @@ class IssueImpl implements Issue
                                       newHashSet(transform((Set<IssueImpl>)getReferences(), specId)),
                                       newArrayList(Lists.transform(getNotes(), specNote)),
                                       isOpen() ? HelpdeskSpec.Status.OPEN : HelpdeskSpec.Status.CLOSED);
-    }
-    
-    @AsFunction
-    HelpdeskSpec.Id specId()
-    {
-        return new HelpdeskSpec.Id(this);
     }
     
     static HelpdeskSpec.TextNote specNote(Person analyst, String text)

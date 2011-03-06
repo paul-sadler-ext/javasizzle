@@ -42,26 +42,21 @@ import org.jsizzle.Xi;
         Analyst getAnalyst();
     }
     
-    class AbstractNote
-    {
-        Analyst analyst;
-    }
-    
     class TextNote implements Note
     {
-        @Include AbstractNote note;
+        Analyst analyst;
         String text;
     }
     
     class AttachmentNote implements Note
     {
-        @Include AbstractNote note;
+        Analyst analyst;
         File file;
     }
     
     class ResolutionNote implements Note
     {
-        @Include AbstractNote note;
+        Analyst analyst;
         Resolution resolution;
     }
     
@@ -135,7 +130,8 @@ import org.jsizzle.Xi;
             
             @Invariant boolean noteAdded()
             {
-                return issue.after.notes.equals(list(concat(issue.before.notes, singleton(note))));
+                return issue.after.notes.equals(
+                    list(concat(issue.before.notes, singleton(note))));
             }
         }
         

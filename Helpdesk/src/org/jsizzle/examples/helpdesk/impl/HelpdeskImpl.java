@@ -103,13 +103,16 @@ public class HelpdeskImpl implements Helpdesk
         public Issue addIssue(Person customer, Person analyst)
         {
             final HelpdeskSpec before = specHelpdesk();
-            final IssueImpl issue = (IssueImpl)HelpdeskImpl.this.addIssue(customer, analyst);
-            new HelpdeskSpec.CreateIssue(new Prime<HelpdeskSpec.Issue>(issue.specIssue()),
+            final IssueImpl issue =
+                (IssueImpl)HelpdeskImpl.this.addIssue(customer, analyst);
+            final HelpdeskSpec after = specHelpdesk();
+            new HelpdeskSpec.CreateIssue(new Prime<HelpdeskSpec.Issue>(
+                                                 issue.specIssue()),
                                          specCustomer(customer),
                                          specAnalyst(analyst),
-                                         new Delta<HelpdeskSpec>(before, specHelpdesk()),
+                                         new Delta<HelpdeskSpec>(before, after),
                                          issue.specId()).checkInvariant();
-            return ((IssueImpl)issue).new Instrumented(HelpdeskImpl.this);
+            return issue.new Instrumented(HelpdeskImpl.this);
         }
 
         @Override
