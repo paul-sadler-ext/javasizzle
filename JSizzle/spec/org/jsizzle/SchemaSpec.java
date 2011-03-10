@@ -30,6 +30,7 @@ import static org.jcurry.ValueObjects.transform;
 import static org.jcurry.ValueObjects.uniques;
 import static org.jsizzle.Delta.deltas;
 
+import java.util.List;
 import java.util.Set;
 
 import org.jsizzle.JavaSpec.Constructor;
@@ -46,6 +47,7 @@ import org.jsizzle.JavaSpec.Variable;
 import org.jsizzle.JavaSpec.Visibility;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 
 /**
  * This specification models the abstract syntax tree (AST) of a
@@ -56,7 +58,8 @@ import com.google.common.base.Function;
  * <p>
  * Also included is a function to resolve <code>Type</code>s from
  * <code>TypeName</code>s. This is required to model the injected
- * fields when using <code>@Include</code>.
+ * fields when using <code>@Include</code>. This function should
+ * represent the post-transformation types.
  */
 @Schema class SchemaSpec
 {
@@ -598,6 +601,47 @@ import com.google.common.base.Function;
     } // End of SchemaField schema
 
     /**
+     * If the input is a class, then the output must contain all of
+     * the expected schema fields.
+     * <p>
+     * Note that this specification is abstract with respect to any
+     * additional fields that are injected in the output class for
+     * utility purposes.
+     */
+    @Invariant boolean fieldsContainExpectedFields()
+    {
+        return type.before.metaType != MetaType.CLASS
+                || transform(type.after.fields,
+                             variableNameAndType)
+                       .containsAll(getExpectedFields());
+    }
+
+    /**
+     * The <code>schemaFields</code> initialised field asserts that
+     * the fields of a schema class are transformed according to the
+     * <code>SchemaField</code> operation schema.
+     * <p>
+     * First, the fields in the input and output classes are matched
+     * up according to their names, and a list of
+     * <code>Delta&ltField&gt</code> is generated, from which
+     * <code>SchemaFields</code>s are constructed using the
+     * constructor function.
+     */
+    @Initialise Set<SchemaField> schemaFields()
+    {
+        switch (type.before.metaType)
+        {
+        case CLASS:
+            return transform(deltas(toSet(type.before.fields),
+                                    toSet(type.after.fields),
+                                    Variable.getName),
+                             SchemaField.schemaField);
+        default:
+            return emptySet();
+        }
+    }
+
+    /**
      * All fields marked with <code>@Include</code> must have types
      * that are available in the given <code>typeResolution</code>
      * function, otherwise the processing of included fields cannot be
@@ -642,17 +686,66 @@ import com.google.common.base.Function;
     }
 
     /**
-     * Helper method that gets all direct, included and expanded
-     * fields in the expected order.
+     * <code>getExpectedFields()</code> is a helper method that gets
+     * all direct, expanded and initialised fields in the expected
+     * order.
+     * <p>
+     * Direct fields are those that are members of the input class.
+     * Expanded fields are those that are added to the output class
+     * from the fields of a direct field marked <code>@Include</code>.
+     * Initialised fields are those that are included by virtue of the
+     * existence of an initialise method (note that an initialise
+     * method can initialise any direct or expanded field, or create a
+     * new field if none of the fields match the method name).
      */
     Set<NameAndType> getExpectedFields()
     {
-        return toSet(uniques(concat(transform(type.before.fields, variableNameAndType),
-                                    concat(transform(type.before.fields, injectedFieldsForField)),
-                                    concat(transform(type.before.methods, injectedFieldsForMethod))),
+        final List<NameAndType> directFields =
+            transform(type.before.fields, variableNameAndType);
+        
+        final Iterable<NameAndType> expandedFields =
+            concat(transform(type.before.fields,
+                             injectedFieldsForField));
+        
+        final Iterable<NameAndType> initialisedFields =
+            concat(transform(type.before.methods,
+                             injectedFieldsForMethod));
+        
+        return toSet(uniques(concat(directFields,
+                                    expandedFields,
+                                    initialisedFields),
                              NameAndType.getName));
     }
 
+    /**
+     * <code>constructorArgsForField(Variable)</code> is a utility
+     * function that obtains the expected arguments for a field in the
+     * input class.
+     * <p>
+     * For <i>static</i> fields, nothing is returned. For fields not
+     * marked <code>@Include</code>, the name and type of the field
+     * itself is returned. For included fields, all arguments to the
+     * schema class constructor of the resolved field type are
+     * returned, <i>except</i> those that conflict by name with an
+     * existing field, and those that are initialised by any previous
+     * inclusion.
+     * <p>
+     * Note that arguments from an inclusion that are initialised by a
+     * later inclusion will appear as a constructor argument. The
+     * corresponding expanded field will be initialised from the
+     * argument, possibly leading to a conflict between the expanded
+     * field and the corresponding field of the later included field
+     * object. This is a symptom of the ordering of fields and of
+     * constructor body statements, and the need for a distinction
+     * between initialisations and invariants (no such distinction
+     * exists in Z); which are both due to <font
+     * face="Cooper Black">JSizzle</font> being based on Java.
+     * Resolving this issue could be a subject for future work.
+     * 
+     * @param field a field in the input class
+     * @return the arguments required to fully initialise the given
+     *         field
+     */
     Iterable<NameAndType> constructorArgsForField(Variable field)
     {
         if (field.otherModifiers.contains(Modifier.STATIC))
@@ -661,11 +754,29 @@ import com.google.common.base.Function;
         }
         else if (field.annotations.contains(JSizzleTypeName.INCLUDE))
         {
-            return filter(transform(getSchemaClassConstructor(typeResolution.apply(field.typeName)).getArguments(),
+            final Constructor incTypeConstructor =
+                getSchemaClassConstructor(
+                    typeResolution.apply(field.typeName));
+            
+            final Predicate<NameAndType> conflictExisting =
+                compose(in(transform(type.before.fields,
+                                     Variable.getName)),
+                        NameAndType.getName);
+
+            /* Note that fieldInitialisedByInclusion is a
+             * two-parameter function returning a boolean. It is
+             * curried and partially applied here to generate a
+             * predicate. */
+            final Predicate<NameAndType> initByPreviousInclusion =
+                or(transform(limit(type.before.fields,
+                                   indexOf(type.before.fields,
+                                           equalTo(field))),
+                             fieldInitialisedByInclusion));
+            
+            return filter(transform(incTypeConstructor.getArguments(),
                                     variableNameAndType),
-                          and(compose(not(in(transform(type.before.fields, Variable.getName))), NameAndType.getName),
-                              not(or(transform(limit(type.before.fields, indexOf(type.before.fields, equalTo(field))),
-                                               fieldInitialisedByInclusion)))));
+                          and(not(conflictExisting),
+                              not(initByPreviousInclusion)));
         }
         else
         {
@@ -673,14 +784,33 @@ import com.google.common.base.Function;
         }
     }
 
+    /**
+     * The <code>injectedFieldsForField(Variable)</code> utility
+     * function obtains an ordered sequence of expanded field names
+     * and types for a given input field. If the input field is not
+     * marked with <code>@Include</code>, then no new fields are
+     * returned. If it is, then all direct and expanded schema fields
+     * (identified by the <code>@SchemaField</code> annotation) from
+     * the resolved schema type of the field are returned, excluding
+     * any fields marked <code>@Include</code>.
+     * <p>
+     * This formally defines the set of 'expanded' fields for a given
+     * 'included' field.
+     * 
+     * @param field any field of the input class.
+     * @return a sequence of fields to inject into the output class.
+     */
     Iterable<NameAndType> injectedFieldsForField(Variable field)
     {
         if (field.annotations.contains(JSizzleTypeName.INCLUDE))
         {
-            return transform(filter(typeResolution.apply(field.typeName).fields,
-                                    compose(and(contains(JSizzleTypeName.SCHEMAFIELD),
-                                                not(contains(JSizzleTypeName.INCLUDE))),
-                                            Variable.getAnnotations)),
+            final List<Variable> typeFields =
+                typeResolution.apply(field.typeName).fields;
+            
+            return transform(filter(typeFields,
+                compose(and(contains(JSizzleTypeName.SCHEMAFIELD),
+                            not(contains(JSizzleTypeName.INCLUDE))),
+                        Variable.getAnnotations)),
                              variableNameAndType);
         }
         else
@@ -689,11 +819,29 @@ import com.google.common.base.Function;
         }
     }
 
+    /**
+     * The <code>injectedFieldsForMethod(Method)</code> utility
+     * returns a sequence of fields to be in injected into the output
+     * schema class, given an input method.
+     * <p>
+     * If the method is marked with <code>@Initialise</code> then a
+     * single field with the same name as the method and of its return
+     * type is returned. Otherwise, an empty sequence is returned.
+     * <p>
+     * Note that this utility returns a field for a method that may be
+     * initialising an existing field; it is the responsibility of the
+     * caller to handle this scenario and not inject a field that
+     * already exists.
+     * 
+     * @param method a method of the input class
+     * @return a sequence of fields to inject in the output class
+     */
     Iterable<NameAndType> injectedFieldsForMethod(Method method)
     {
         if (method.annotations.contains(JSizzleTypeName.INITIALISE))
         {
-            return singleton(new NameAndType(method.name, method.returnType));
+            return singleton(new NameAndType(method.name,
+                                             method.returnType));
         }
         else
         {
@@ -701,52 +849,72 @@ import com.google.common.base.Function;
         }
     }
 
+    /**
+     * The <code>fieldInitialisedLocally(NameAndType)</code> utility
+     * determines if the given field is initialised by an initialiser
+     * method in the input class.
+     * 
+     * @param field an existing or putative schema field
+     */
     boolean fieldInitialisedLocally(NameAndType field)
     {
         return contains(transform(filter(type.before.methods,
-                                         compose(contains(JSizzleTypeName.INITIALISE),
-                                                 Method.getAnnotations)),
+                     compose(contains(JSizzleTypeName.INITIALISE),
+                             Method.getAnnotations)),
                                   methodNameAndType),
                         field);
     }
-    
-    boolean fieldInitialisedByInclusion(Variable included, NameAndType field)
+
+    /**
+     * The
+     * <code>fieldInitialisedByInclusion(Variable, NameAndType)</code>
+     * utility determines if the given field is initialised in the
+     * given included field's schema type.
+     * <p>
+     * This operates by checking whether the given field is one of the
+     * expanded fields for the included schema but is not found in its
+     * constructor (and therefore must be initialised in the schema,
+     * one way or another).
+     * 
+     * @param included an included field
+     * @param field a schema field
+     */
+    boolean fieldInitialisedByInclusion(Variable included,
+                                        NameAndType field)
     {
-        return contains(filter(injectedFieldsForField(included), not(in(list(constructorArgsForField(included))))), field);
+        return contains(filter(injectedFieldsForField(included),
+                               not(in(list(
+                                constructorArgsForField(included))))),
+                        field);
     }
 
+    /**
+     * The <code>variableNameAndType(Variable)</code> utility returns
+     * a <code>NameAndType</code> with the name and type of the given
+     * <code>Variable</code>.
+     */
     static NameAndType variableNameAndType(Variable variable)
     {
         return new NameAndType(variable.name, variable.typeName);
     }
 
+    /**
+     * The <code>variableNameAndType(Method)</code> utility returns a
+     * <code>NameAndType</code> with the name and return type of the
+     * given <code>Method</code>.
+     */
     static NameAndType methodNameAndType(Method method)
     {
         return new NameAndType(method.name, method.returnType);
     }
 
+    /**
+     * The <code>getSchemaClassConstructor(Type)</code> utility
+     * returns the one and only constructor for the given schema type.
+     * Note that the given type is assumed to be a schema.
+     */
     static Constructor getSchemaClassConstructor(Type type)
     {
         return type.constructors.iterator().next();
     }
-
-    @Invariant boolean fieldsContainExpectedFields()
-    {
-        return type.before.metaType != MetaType.CLASS
-                || transform(type.after.fields, variableNameAndType).containsAll(getExpectedFields());
-    }
-
-    @Initialise Set<SchemaField> schemaFields()
-    {
-        switch (type.before.metaType)
-        {
-        case CLASS:
-            return transform(deltas(toSet(type.before.fields),
-                                    toSet(type.after.fields),
-                                    Variable.getName),
-                             SchemaField.schemaField);
-        default:
-            return emptySet();
-        }
-    }
-}
+} // End of SchemaSpec schema
