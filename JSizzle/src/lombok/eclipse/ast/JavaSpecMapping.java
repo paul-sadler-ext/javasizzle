@@ -149,7 +149,7 @@ public class JavaSpecMapping
     }
     
     @AsFunction
-    public Method specMethod(TypeDeclaration scope, MethodDeclaration method)
+    private Method specMethod(TypeDeclaration scope, MethodDeclaration method)
     {
         char[] name = method.selector;
 		return new Method(specVisibility(method.modifiers),
@@ -162,7 +162,7 @@ public class JavaSpecMapping
     }
     
     @AsFunction
-    public Constructor specConstructor(TypeDeclaration scope, ConstructorDeclaration constructor)
+    private Constructor specConstructor(TypeDeclaration scope, ConstructorDeclaration constructor)
     {
         return new Constructor(specVisibility(constructor.modifiers),
                                specOtherModifiers(constructor.modifiers),
@@ -171,7 +171,7 @@ public class JavaSpecMapping
     }
     
     @AsFunction
-    public Variable specVariable(TypeDeclaration scope, AbstractVariableDeclaration variable)
+    private Variable specVariable(TypeDeclaration scope, AbstractVariableDeclaration variable)
     {
         return new Variable(specVisibility(variable.modifiers),
                             specOtherModifiers(variable.modifiers),
@@ -181,18 +181,18 @@ public class JavaSpecMapping
     }
     
     @AsFunction
-    public TypeName specAnnotation(TypeDeclaration scope, Annotation annotation)
+    private TypeName specAnnotation(TypeDeclaration scope, Annotation annotation)
     {
         return specReference(scope, annotation.type);
     }
     
     @AsFunction
-    public TypeName specReference(TypeDeclaration scope, TypeReference reference)
+    private TypeName specReference(TypeDeclaration scope, TypeReference reference)
     {
         return specTypeName(scope, reference == null ? null : reference.getTypeName());
     }
     
-    public TypeName specTypeName(TypeDeclaration scope, final char[][] localName)
+    private TypeName specTypeName(TypeDeclaration scope, final char[][] localName)
     {
         if (localName == null)
         {
@@ -213,7 +213,7 @@ public class JavaSpecMapping
         }
     }
     
-    public TypeName specClassName(final char[][] qualifiedName)
+    private TypeName specClassName(final char[][] qualifiedName)
     {
         final String key = qualifiedName == null ? null : toQualifiedName(qualifiedName);
         TypeName typeName = typeNames.get(key);
