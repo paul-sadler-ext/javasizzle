@@ -198,7 +198,8 @@ import org.jsizzle.Xi;
         
         @Initialise Delta<Issue> issue()
         {
-            return new Delta<Issue>(helpdesk.before.issues.get(id), helpdesk.after.issues.get(id));
+            return new Delta<Issue>(helpdesk.before.issues.get(id),
+                                    helpdesk.after.issues.get(id));
         }
         
         @Invariant boolean mustBeExistingIssue()
