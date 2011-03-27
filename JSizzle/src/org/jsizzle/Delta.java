@@ -75,7 +75,16 @@ public class Delta<T extends Binding<T>> implements Iterable<T>
     {
         return Iterators.forArray(before, after);
     }
-    
+
+    /**
+     * Returns a set of {@link Delta}s that relate the bindings in the
+     * <code>before</code> parameter to the bindings in the
+     * <code>after</code> parameter, using the given function to
+     * establish binding identity.
+     * <p>
+     * Only bindings that are present (according to the identity
+     * function) in both parameters will be returned.
+     */
     public static <T extends Binding<T>, U> Set<Delta<T>> deltas(Set<? extends T> befores,
                                                                  Set<? extends T> afters,
                                                                  Function<? super T, U> uniqueness)
