@@ -737,9 +737,8 @@ import com.google.common.base.Predicate;
      * field and the corresponding field of the later included field
      * object. This is a symptom of the ordering of fields and of
      * constructor body statements, and the need for a distinction
-     * between initialisations and invariants (no such distinction
-     * exists in Z); which are both due to <font
-     * face="Cooper Black">JSizzle</font> being based on Java.
+     * between initialisations and invariants; which are both due to
+     * <font face="Cooper Black">JSizzle</font> being based on Java.
      * Resolving this issue could be a subject for future work.
      * 
      * @param field a field in the input class
