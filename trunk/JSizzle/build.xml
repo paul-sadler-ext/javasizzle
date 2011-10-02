@@ -1,21 +1,31 @@
 <project name="JSizzle" default="dist" basedir=".">
 	<description>
-		simple example build file
+		JSizzle build file
     </description>
+	<property name="version" value="0.1"/>
 
 	<target name="dist" description="generate the distribution">
-		<mkdir dir="dist"/>
-		<jar destfile="dist/jsizzle.jar">
+		<delete dir="dist"/>
+		<mkdir dir="dist/jsizzle"/>
+		<jar destfile="dist/jsizzle/jsizzle.jar">
 			<fileset dir="bin" />
 			<service type="lombok.eclipse.EclipseAnnotationHandler">
 				<provider classname="lombok.eclipse.HandleSchema" />
 			</service>
 		</jar>
-		<zip destfile="dist/jsizzle-src.zip">
+		<zip destfile="dist/jsizzle/jsizzle-src.zip">
 			<fileset dir="src" />
 			<fileset dir="spec" />
 		</zip>
-		<copy file="dist/jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
+		<copy todir="dist/jsizzle">
+			<fileset dir="doc"/>
+		</copy>
+		<javadoc sourcepath="src"
+			excludepackagenames="lombok.eclipse,lombok.eclipse.ast"
+			destdir="dist/jsizzle/javadoc"
+			classpath="${guava.lib};C:/eclipse/jcurry.jar;C:/eclipse/lombok.jar"/>
+		<zip basedir="dist" destfile="dist/jsizzle-${version}.zip"/>
+		<copy file="dist/jsizzle/jsizzle.jar" tofile="C:/eclipse/jsizzle.jar" />
 	</target>
 </project>
 
