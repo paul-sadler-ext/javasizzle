@@ -136,16 +136,16 @@ public class JavaSpecMapping
     {
 		return new Type(specVisibility(type.modifiers),
                         specOtherModifiers(type.modifiers),
-                        specSet(type.annotations, specAnnotation.apply(type)),
+                        specSet(type.annotations, specAnnotation.apply(this).apply(type)),
                         specClassName(fullyQualifiedName(type, compilationUnit)),
                         specMetaType(type.modifiers),
                         specTypeScope(type),
                         specReference(type.enclosingType, type.superclass),
-                        specSet(type.superInterfaces, specReference.apply(type.enclosingType)),
-                        specList(type.fields, specVariable.apply(type)),
-                        specList(type.memberTypes, specType),
-                        specList(type.methods, specConstructor.apply(type), ConstructorDeclaration.class, nonDefaultConstructors),
-                        specList(type.methods, specMethod.apply(type), MethodDeclaration.class));
+                        specSet(type.superInterfaces, specReference.apply(this).apply(type.enclosingType)),
+                        specList(type.fields, specVariable.apply(this).apply(type)),
+                        specList(type.memberTypes, specType.apply(this)),
+                        specList(type.methods, specConstructor.apply(this).apply(type), ConstructorDeclaration.class, nonDefaultConstructors),
+                        specList(type.methods, specMethod.apply(this).apply(type), MethodDeclaration.class));
     }
     
     @AsFunction
@@ -154,10 +154,10 @@ public class JavaSpecMapping
         char[] name = method.selector;
 		return new Method(specVisibility(method.modifiers),
                           specOtherModifiers(method.modifiers),
-                          specSet(method.annotations, specAnnotation.apply(scope)),
-                          specList(method.arguments, specVariable.apply(scope)),
+                          specSet(method.annotations, specAnnotation.apply(this).apply(scope)),
+                          specList(method.arguments, specVariable.apply(this).apply(scope)),
                           specName(name),
-                          specList(method.arguments, compose(Variable.getTypeName, specVariable.apply(scope))),
+                          specList(method.arguments, compose(Variable.getTypeName, specVariable.apply(this).apply(scope))),
                           specReference(scope, method.returnType));
     }
     
@@ -166,8 +166,8 @@ public class JavaSpecMapping
     {
         return new Constructor(specVisibility(constructor.modifiers),
                                specOtherModifiers(constructor.modifiers),
-                               specSet(constructor.annotations, specAnnotation.apply(scope)),
-                               specList(constructor.arguments, specVariable.apply(scope)));
+                               specSet(constructor.annotations, specAnnotation.apply(this).apply(scope)),
+                               specList(constructor.arguments, specVariable.apply(this).apply(scope)));
     }
     
     @AsFunction
@@ -175,7 +175,7 @@ public class JavaSpecMapping
     {
         return new Variable(specVisibility(variable.modifiers),
                             specOtherModifiers(variable.modifiers),
-                            specSet(variable.annotations, specAnnotation.apply(scope)),
+                            specSet(variable.annotations, specAnnotation.apply(this).apply(scope)),
                             specName(variable.name),
                             specReference(scope, variable.type));
     }
