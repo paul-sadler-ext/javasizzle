@@ -21,7 +21,7 @@
 			<fileset dir="doc"/>
 		</copy>
 		<javadoc sourcepath="src"
-			excludepackagenames="lombok.eclipse,lombok.eclipse.ast"
+			excludepackagenames="lombok.eclipse,lombok.eclipse.ast,lombok.eclipse.handlers"
 			destdir="dist/jsizzle/javadoc"
 			classpath="${guava.lib};C:/eclipse/jcurry.jar;C:/eclipse/lombok.jar"/>
 		<zip basedir="dist" destfile="dist/jsizzle-${version}.zip"/>

@@ -551,7 +551,7 @@ import com.google.common.base.Predicate;
             return transform(deltas(toSet(type.before.methods),
                                     toSet(type.after.methods),
                                     Method.getSignature),
-                             SchemaMethod.schemaMethod);
+                             schemaMethod);
         default:
             return emptySet();
         }
@@ -635,7 +635,7 @@ import com.google.common.base.Predicate;
             return transform(deltas(toSet(type.before.fields),
                                     toSet(type.after.fields),
                                     Variable.getName),
-                             SchemaField.schemaField);
+                             schemaField);
         default:
             return emptySet();
         }
@@ -680,9 +680,9 @@ import com.google.common.base.Predicate;
     Iterable<NameAndType> getConstructorArgs()
     {
         return filter(uniques(concat(transform(type.before.fields,
-                                            constructorArgsForField)),
+                                            constructorArgsForField.apply(this))),
                               NameAndType.getName),
-                      not(fieldInitialisedLocally));
+                      not(fieldInitialisedLocally.apply(this)));
     }
 
     /**
@@ -705,11 +705,11 @@ import com.google.common.base.Predicate;
         
         final Iterable<NameAndType> expandedFields =
             concat(transform(type.before.fields,
-                             injectedFieldsForField));
+                             injectedFieldsForField.apply(this)));
         
         final Iterable<NameAndType> initialisedFields =
             concat(transform(type.before.methods,
-                             injectedFieldsForMethod));
+                             injectedFieldsForMethod.apply(this)));
         
         return toSet(uniques(concat(directFields,
                                     expandedFields,
@@ -770,7 +770,7 @@ import com.google.common.base.Predicate;
                 or(transform(limit(type.before.fields,
                                    indexOf(type.before.fields,
                                            equalTo(field))),
-                             fieldInitialisedByInclusion));
+                             fieldInitialisedByInclusion.apply(this)));
             
             return filter(transform(incTypeConstructor.getArguments(),
                                     variableNameAndType),
