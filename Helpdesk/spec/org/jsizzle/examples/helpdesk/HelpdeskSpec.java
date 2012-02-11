@@ -14,7 +14,9 @@ import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.jcurry.ValueObjects.list;
 import static org.jcurry.ValueObjects.override;
+import static org.jcurry.ValueObjects.toSet;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +28,8 @@ import org.jsizzle.Invariant;
 import org.jsizzle.Prime;
 import org.jsizzle.Schema;
 import org.jsizzle.Xi;
+
+import com.google.common.base.Predicate;
 
 @Schema class HelpdeskSpec
 {
@@ -177,7 +181,8 @@ import org.jsizzle.Xi;
         
         @Invariant boolean issuesUpdated()
         {
-            return helpdesk.after.issues.equals(override(helpdesk.before.issues, singletonMap(id, issue.after)));
+            return helpdesk.after.issues.equals(
+                override(helpdesk.before.issues, singletonMap(id, issue.after)));
         }
     }
 
@@ -249,14 +254,47 @@ import org.jsizzle.Xi;
     class ReportIssuesForAnalyst
     {
         Xi<HelpdeskSpec> helpdesk;
-        List<Issue> analystIssues;
+        Set<Issue> analystIssues;
         Analyst analyst;
 
         @Invariant boolean analystOpenIssuesReported()
         {
-            return analystIssues.equals(list(filter(helpdesk.before.issues.values(),
-                                                    and(compose(equalTo(analyst), Issue.getAnalyst),
-                                                        compose(equalTo(Status.OPEN), Issue.getStatus)))));
+            return analystIssues.equals(toSet(
+                filter(helpdesk.before.issues.values(),
+                       and(compose(equalTo(analyst), Issue.getAnalyst),
+                           compose(equalTo(Status.OPEN),
+                                   Issue.getStatus)))));
+        }
+
+        @Invariant boolean analystOpenIssuesReportedGuava()
+        {
+            return analystIssues.equals(toSet(
+                filter(helpdesk.before.issues.values(),
+                       new Predicate<Issue>()
+                {
+                    @Override public boolean apply(Issue issue)
+                    {
+                        return analyst.equals(issue.analyst) &&
+                            issue.status == Status.OPEN;
+                    }
+                })));
+        }
+
+        @Invariant boolean analystOpenIssuesReportedProcedurally()
+        {
+            final Set<Issue> expectedAnalystIssues =
+                new HashSet<Issue>();
+            
+            for (Issue issue : helpdesk.before.issues.values())
+            {
+                if (analyst.equals(issue.analyst)
+                        && issue.status == Status.OPEN)
+                {
+                    expectedAnalystIssues.add(issue);
+                }
+            }
+            
+            return analystIssues.equals(expectedAnalystIssues);
         }
     }
 }

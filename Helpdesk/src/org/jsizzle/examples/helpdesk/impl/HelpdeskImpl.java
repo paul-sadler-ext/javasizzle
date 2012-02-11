@@ -4,6 +4,7 @@ import static com.google.common.collect.Lists.transform;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static org.jcurry.ValueObjects.toSet;
 import static org.jsizzle.examples.helpdesk.impl.IssueImpl.specId;
 import static org.jsizzle.examples.helpdesk.impl.IssueImpl.specIssue;
 
@@ -120,9 +121,10 @@ public class HelpdeskImpl implements Helpdesk
         public List<? extends Issue> getAnalystOpenIssues(Person analyst)
         {
             final HelpdeskSpec helpdeskBefore = specHelpdesk();
-            final List<IssueImpl> analystOpenIssues = (List<IssueImpl>)HelpdeskImpl.this.getAnalystOpenIssues(analyst);
+            final List<IssueImpl> analystOpenIssues =
+                (List<IssueImpl>)HelpdeskImpl.this.getAnalystOpenIssues(analyst);
             new HelpdeskSpec.ReportIssuesForAnalyst(new Xi<HelpdeskSpec>(helpdeskBefore, specHelpdesk()),
-                                                    transform(analystOpenIssues, specIssue),
+                                                    toSet(transform(analystOpenIssues, specIssue)),
                                                     specAnalyst(analyst)).checkInvariant();
             return analystOpenIssues;
         }
