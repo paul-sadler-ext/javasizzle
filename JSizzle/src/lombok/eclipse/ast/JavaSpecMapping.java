@@ -117,7 +117,7 @@ public class JavaSpecMapping
     public JavaSpecMapping(EclipseNode start)
     {
         this.compilationUnit = (CompilationUnitDeclaration)start.top().get();
-        this.resolver = new TypeResolver(typeLibrary, start.getPackageDeclaration(), start.getImportStatements());
+        this.resolver = new TypeResolver(start.getPackageDeclaration(), start.getImportStatements());
     }
     
     @AsFunction
@@ -207,7 +207,7 @@ public class JavaSpecMapping
             }
             else
             {
-                final Iterator<String> matches = resolver.findTypeMatches(null, toQualifiedName(localName)).iterator();
+                final Iterator<String> matches = resolver.findTypeMatches(null, typeLibrary, toQualifiedName(localName)).iterator();
                 return specClassName(matches.hasNext() ? fromQualifiedName(matches.next()) : localName);
             }
         }

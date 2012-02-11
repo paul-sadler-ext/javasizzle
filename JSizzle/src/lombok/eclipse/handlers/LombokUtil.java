@@ -4,12 +4,14 @@ import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 
 import lombok.AccessLevel;
 import lombok.eclipse.EclipseNode;
+import lombok.eclipse.handlers.EclipseHandlerUtil.FieldAccess;
 
 public class LombokUtil
 {
     public static void generateEqualsAndHashCode(EclipseNode typeNode, EclipseNode errorNode)
     {
-        new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, errorNode);
+        // Have to force the generation not to call super(), so can't use generateEqualsAndHashCodeForType
+        new HandleEqualsAndHashCode().generateMethods(typeNode, errorNode, null, null, false, false, FieldAccess.GETTER);
     }
     
     public static void generateToStringForType(EclipseNode typeNode, EclipseNode errorNode)
