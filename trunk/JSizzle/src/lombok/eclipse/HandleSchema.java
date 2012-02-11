@@ -5,7 +5,8 @@ import static java.util.Collections.disjoint;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static lombok.eclipse.Eclipse.fromQualifiedName;
-import static lombok.eclipse.Eclipse.getGeneratedBy;
+import static lombok.eclipse.handlers.EclipseHandlerUtil.getGeneratedBy;
+import static lombok.eclipse.handlers.EclipseHandlerUtil.annotationTypeMatches;
 import static lombok.eclipse.Eclipse.toQualifiedName;
 import static lombok.eclipse.HandleAsFunction.generateFunction;
 import static lombok.eclipse.Source.source;
@@ -384,7 +385,7 @@ public class HandleSchema extends EclipseAnnotationHandler<Schema>
                     {
                         if ((def.bits & ASTNode.IsDefaultConstructor) != 0)
                             continue;
-                        return Eclipse.getGeneratedBy(def) == null ? null : (ConstructorDeclaration)def;
+                        return getGeneratedBy(def) == null ? null : (ConstructorDeclaration)def;
                     }
                 }
             }
@@ -408,7 +409,7 @@ public class HandleSchema extends EclipseAnnotationHandler<Schema>
         {
             if (annNode.getKind() == Kind.ANNOTATION)
             {
-                if (Eclipse.annotationTypeMatches(annClass, annNode))
+                if (annotationTypeMatches(annClass, annNode))
                     return annNode;
             }
         }
