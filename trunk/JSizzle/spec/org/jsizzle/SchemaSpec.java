@@ -277,14 +277,6 @@ import com.google.common.base.Predicate;
         }
 
         /**
-         * A generated schema class constructor has no annotations.
-         */
-        @Invariant boolean hasNoAnnotations()
-        {
-            return constructor.after.annotations.isEmpty();
-        }
-
-        /**
          * A generated schema class constructor has no modifiers
          * besides <i>public</i>.
          */
@@ -475,8 +467,7 @@ import com.google.common.base.Predicate;
         @Invariant boolean isPublicFinal()
         {
             return method.after.visibility.equals(Visibility.PUBLIC)
-                && method.after.otherModifiers.equals(
-                       singleton(Modifier.FINAL));
+                && method.after.otherModifiers.contains(Modifier.FINAL);
         }
     }
 
@@ -581,8 +572,7 @@ import com.google.common.base.Predicate;
         @Invariant boolean isPublicFinal()
         {
             return field.after.visibility.equals(Visibility.PUBLIC)
-                && field.after.otherModifiers.equals(
-                       singleton(Modifier.FINAL));
+                && field.after.otherModifiers.contains(Modifier.FINAL);
         }
 
         /**
