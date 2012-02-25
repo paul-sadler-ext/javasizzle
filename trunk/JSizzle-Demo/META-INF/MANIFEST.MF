@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JSizzle-Demo
+Bundle-SymbolicName: JSizzle-Demo
+Bundle-Version: 1.0.0.qualifier
+Export-Package: demo
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Require-Bundle: com.quantrix.qapi;bundle-version="4.0.0"
+Bundle-Activator: demo.DemoActivator
+Bundle-ClassPath: .,
+ lib/guava-11.0.1.jar,
+ lib/jcurry.jar,
+ lib/jsizzle.jar

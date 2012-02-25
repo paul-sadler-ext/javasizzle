@@ -1,5 +1,9 @@
 package demo;
 
+import static com.google.common.base.Predicates.equalTo;
+import static com.google.common.collect.Iterables.all;
+import static com.google.common.collect.Iterables.transform;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,14 +33,19 @@ import org.jsizzle.Schema;
     {
         Map<Category, Name> categoryItems;
         
+        Set<Category> categories()
+        {
+            return categoryItems.keySet();
+        }
+        
         @Invariant boolean itemsValid()
         {
-            for (Category c : categoryItems.keySet())
-            {
-                if (!c.items.contains(categoryItems.get(c)))
-                    return false;
-            }
-            return true;
+            return all(categories(), itemValid.apply(this));
+        }
+        
+        boolean itemValid(Category c)
+        {
+            return c.items.contains(categoryItems.get(c));
         }
     }
     
@@ -44,11 +53,6 @@ import org.jsizzle.Schema;
     
     @Invariant boolean addressesOk()
     {
-        for (Address a : cells.keySet())
-        {
-            if (!a.categoryItems.keySet().equals(categories))
-                return false;
-        }
-        return true;
+        return all(transform(cells.keySet(), Address.categories), equalTo(categories));
     }
 }
